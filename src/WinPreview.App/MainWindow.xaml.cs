@@ -197,7 +197,20 @@ public sealed partial class MainWindow : Window
     {
         if (_closeConfirmed || _session is not { IsDirty: true }) { Cleanup(); return; }
         args.Cancel = true;
+        await RequestCloseAsync();
+    }
+
+    /// <summary>Closes the window, first offering to save unsaved changes. (Window.Close() skips AppWindow.Closing.)</summary>
+    public async Task RequestCloseAsync()
+    {
         DocView.CommitInlineEditor();
+        if (_session is not { IsDirty: true })
+        {
+            Cleanup();
+            _closeConfirmed = true;
+            Close();
+            return;
+        }
         var dlg = new ContentDialog
         {
             XamlRoot = Root.XamlRoot,
@@ -209,6 +222,7 @@ public sealed partial class MainWindow : Window
         var result = await dlg.ShowAsync();
         if (result == ContentDialogResult.None) return;
         if (result == ContentDialogResult.Primary && !await SaveAsync()) return;
+        Cleanup();
         _closeConfirmed = true;
         Close();
     }

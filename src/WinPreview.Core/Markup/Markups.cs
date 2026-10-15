@@ -92,7 +92,7 @@ public sealed class LineMarkup : MarkupItem
     public bool ArrowAtEnd { get; set; }
 
     /// <summary>Arrowhead length, scaled with the stroke so thick arrows stay proportional.</summary>
-    public double ArrowLength => Math.Max(8, StrokeWidth * 4);
+    public double ArrowLength => Math.Max(11, StrokeWidth * 5);
 
     public override RectD Bounds => RectD.FromPoints(Start, End).Inflate(ArrowAtEnd ? ArrowLength : StrokeWidth);
     public override void Transform(Affine m)

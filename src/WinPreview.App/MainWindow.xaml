@@ -55,7 +55,7 @@
                     <FontIcon Glyph="&#xE72D;" FontSize="16" />
                 </Button>
                 <ToggleButton x:Name="MarkupToggle" Style="{StaticResource ToolToggleStyle}" Click="MarkupToggle_Click" ToolTipService.ToolTip="Show Markup Toolbar (Ctrl+Shift+A)">
-                    <FontIcon Glyph="&#xE70F;" FontSize="16" />
+                    <FontIcon Glyph="&#xEDFB;" FontSize="16" />
                 </ToggleButton>
                 <Button Style="{StaticResource ToolButtonStyle}" Click="RotateLeft_Click" ToolTipService.ToolTip="Rotate left (Ctrl+L)">
                     <FontIcon Glyph="&#xE7AD;" FontSize="16" RenderTransformOrigin="0.5,0.5">

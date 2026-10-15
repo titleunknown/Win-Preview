@@ -131,7 +131,7 @@ public sealed partial class DocumentView
                 _liveStroke = [user];
                 var preview = new Polyline
                 {
-                    Stroke = CurrentStyle.Stroke.Brush(), StrokeThickness = CurrentStyle.StrokeWidth * map.Scale,
+                    Stroke = CurrentStyle.Stroke.Brush(), StrokeThickness = CurrentStyle.StrokeWidth * StyleScale(page) * map.Scale,
                     StrokeLineJoin = PenLineJoin.Round, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round,
                     IsHitTestVisible = false, Points = { dip },
                 };
@@ -146,10 +146,11 @@ public sealed partial class DocumentView
             case Tool.Text:
             {
                 ClearMarkupSelection();
-                var draftRectDip = new Rect(dip.X, dip.Y - CurrentStyle.FontSize * map.Scale * 0.7, 180, (CurrentStyle.FontSize * 1.2 + 4) * map.Scale);
+                double fontSize = CurrentStyle.FontSize * StyleScale(page);
+                var draftRectDip = new Rect(dip.X, dip.Y - fontSize * map.Scale * 0.7, 60, (fontSize * 1.2 + 4) * map.Scale);
                 var draft = new TextBoxMarkup
                 {
-                    Rect = map.ToUser(draftRectDip), FontSize = CurrentStyle.FontSize, Font = CurrentStyle.Font, Color = CurrentStyle.TextColor, Fill = CurrentStyle.Fill,
+                    Rect = map.ToUser(draftRectDip), FontSize = fontSize, Font = CurrentStyle.Font, Color = CurrentStyle.TextColor, Fill = CurrentStyle.Fill,
                 };
                 Tool = Tool.Select;
                 BeginTextEdit(page, draft, isNew: true);
@@ -279,7 +280,7 @@ public sealed partial class DocumentView
             case DragKind.Ink when _liveStroke is { Count: > 0 }:
                 _session.AddMarkup(_dragPage, new InkMarkup
                 {
-                    Color = CurrentStyle.Stroke, StrokeWidth = CurrentStyle.StrokeWidth, Strokes = [Simplify(_liveStroke, map.UserLength(0.4))],
+                    Color = CurrentStyle.Stroke, StrokeWidth = CurrentStyle.StrokeWidth * StyleScale(_dragPage), Strokes = [Simplify(_liveStroke, map.UserLength(0.4))],
                 }, "Draw");
                 break;
             case DragKind.Shape:
@@ -316,6 +317,7 @@ public sealed partial class DocumentView
     private MarkupItem BuildShape(PageMapping map, Point a, Point b, bool constrain)
     {
         bool tiny = Math.Abs(a.X - b.X) < 4 && Math.Abs(a.Y - b.Y) < 4;
+        double width = CurrentStyle.StrokeWidth * StyleScale(_dragPage);
         if (Tool is Tool.Line or Tool.Arrow)
         {
             if (tiny) b = new Point(a.X + 120, a.Y);
@@ -328,7 +330,7 @@ public sealed partial class DocumentView
             }
             return new LineMarkup
             {
-                Start = map.ToUser(a), End = map.ToUser(b), ArrowAtEnd = Tool == Tool.Arrow, Color = CurrentStyle.Stroke, StrokeWidth = CurrentStyle.StrokeWidth,
+                Start = map.ToUser(a), End = map.ToUser(b), ArrowAtEnd = Tool == Tool.Arrow, Color = CurrentStyle.Stroke, StrokeWidth = width,
             };
         }
         if (tiny) b = new Point(a.X + 120, a.Y + 80);
@@ -340,7 +342,7 @@ public sealed partial class DocumentView
         return new ShapeMarkup
         {
             Shape = Tool == Tool.Oval ? ShapeKind.Oval : ShapeKind.Rectangle,
-            Rect = map.ToUser(new Rect(a, b)), Color = CurrentStyle.Stroke, StrokeWidth = CurrentStyle.StrokeWidth, Fill = CurrentStyle.Fill,
+            Rect = map.ToUser(new Rect(a, b)), Color = CurrentStyle.Stroke, StrokeWidth = width, Fill = CurrentStyle.Fill,
         };
     }
 
@@ -594,13 +596,19 @@ public sealed partial class DocumentView
                     e.Handled = true;
                     return;
                 // Leave window-level shortcuts alone.
-                case VirtualKey.S or VirtualKey.O or VirtualKey.P or VirtualKey.W or VirtualKey.F when ctrl:
+                case VirtualKey.S or VirtualKey.O or VirtualKey.P or VirtualKey.W or VirtualKey.F or VirtualKey.N when ctrl:
+                    return;
+                // Space must be swallowed so the scroller doesn't page down, and swallowing the key also
+                // suppresses its character, so type it here.
+                case VirtualKey.Space when !ctrl:
+                    pdf.FormChar(_formPage, ' ', PdfModifiers());
+                    e.Handled = true;
                     return;
             }
             pdf.FormKeyDown(_formPage, (int)e.Key, PdfModifiers());
             // Typing keys arrive via CharacterReceived; swallow navigation keys so the scroller doesn't move.
             e.Handled = e.Key is VirtualKey.Left or VirtualKey.Right or VirtualKey.Up or VirtualKey.Down or VirtualKey.Home or VirtualKey.End
-                or VirtualKey.Back or VirtualKey.Delete or VirtualKey.Tab or VirtualKey.Enter or VirtualKey.Space or VirtualKey.PageUp or VirtualKey.PageDown
+                or VirtualKey.Back or VirtualKey.Delete or VirtualKey.Tab or VirtualKey.Enter or VirtualKey.PageUp or VirtualKey.PageDown
                 || ctrl && e.Key is VirtualKey.Z or VirtualKey.Y;
             return;
         }
@@ -656,7 +664,7 @@ public sealed partial class DocumentView
     private void OnCharacterReceived(UIElement sender, CharacterReceivedRoutedEventArgs e)
     {
         if (_formPage < 0 || _editing != null || _session?.Pdf is not { } pdf) return;
-        if (e.Character < 0x20) return; // control characters are handled as key presses
+        if (e.Character <= 0x20) return; // control characters and space are handled as key presses
         pdf.FormChar(_formPage, e.Character, PdfModifiers());
         e.Handled = true;
     }

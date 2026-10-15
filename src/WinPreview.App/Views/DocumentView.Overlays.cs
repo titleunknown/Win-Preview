@@ -257,6 +257,23 @@ public sealed partial class DocumentView
         };
         box.Resources["TextControlBackgroundFocused"] = box.Background;
         box.Resources["TextControlForegroundFocused"] = box.Foreground;
+
+        // Like Preview, the box widens as you type until it reaches the page edge, then wraps.
+        double minWidth = box.Width, maxWidth = Math.Max(minWidth, pv.Width - r.X - 4);
+        var measurer = new TextBlock { FontFamily = box.FontFamily, FontSize = box.FontSize };
+        void Fit()
+        {
+            double widest = 0;
+            foreach (var line in box.Text.Split('\r', '\n'))
+            {
+                measurer.Text = line.Length == 0 ? " " : line;
+                measurer.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                widest = Math.Max(widest, measurer.DesiredSize.Width);
+            }
+            box.Width = Math.Clamp(widest + box.Padding.Left + box.Padding.Right + 14, minWidth, maxWidth);
+        }
+        box.TextChanged += (_, _) => Fit();
+        Fit();
         Canvas.SetLeft(box, r.X);
         Canvas.SetTop(box, r.Y);
         pv.AdornerLayer.Children.Add(box);
@@ -288,7 +305,7 @@ public sealed partial class DocumentView
         _editing = null;
         var pv = ed.Page < _pages.Count ? _pages[ed.Page] : null;
         string text = ed.Box.Text.Replace("\r", "\n");
-        double heightDip = ed.Box.ActualHeight;
+        double heightDip = ed.Box.ActualHeight, widthDip = ed.Box.ActualWidth;
         pv?.AdornerLayer.Children.Remove(ed.Box);
 
         // Text boxes grow downward (in display space) to fit their text.
@@ -297,7 +314,8 @@ public sealed partial class DocumentView
         {
             var map = pv.Mapping;
             var r = map.ToDip(rect);
-            if (heightDip > r.Height) rect = map.ToUser(new Rect(r.X, r.Y, r.Width, heightDip));
+            if (heightDip > r.Height || widthDip > r.Width)
+                rect = map.ToUser(new Rect(r.X, r.Y, Math.Max(r.Width, widthDip), Math.Max(r.Height, heightDip)));
         }
 
         if (ed.IsNew)

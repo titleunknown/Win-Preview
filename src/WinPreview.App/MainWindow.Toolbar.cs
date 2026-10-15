@@ -57,9 +57,9 @@ public sealed partial class MainWindow
             return b;
         }
 
-        bar.Add(ToolButton(Tool.Select, Glyph(""), "Text selection — select text, markups, and form fields"));
+        bar.Add(ToolButton(Tool.Select, Glyph(""), "Text selection — select text, markups, and form fields"));
         bar.Add(ToolButton(Tool.RectSelect, Symbol("⬚", 18), "Rectangular selection — select an area to crop"));
-        bar.Add(ToolButton(Tool.Draw, Glyph(""), "Draw — freehand ink"));
+        bar.Add(ToolButton(Tool.Draw, Glyph(""), "Draw — freehand ink"));
 
         _shapeButton = new DropDownButton { Content = Symbol("▭", 18), Background = new SolidColorBrush(Colors.Transparent), BorderBrush = new SolidColorBrush(Colors.Transparent), Padding = new Thickness(8, 4, 6, 4) };
         ToolTipService.SetToolTip(_shapeButton, "Shapes");
@@ -76,7 +76,7 @@ public sealed partial class MainWindow
         bar.Add(ToolButton(Tool.Text, Glyph(""), "Text box — click to add text"));
         bar.Add(ToolButton(Tool.Note, Glyph(""), "Note — click to add a sticky note"));
 
-        _signButton = new DropDownButton { Content = Glyph(""), Background = new SolidColorBrush(Colors.Transparent), BorderBrush = new SolidColorBrush(Colors.Transparent), Padding = new Thickness(8, 4, 6, 4) };
+        _signButton = new DropDownButton { Content = Glyph(""), Background = new SolidColorBrush(Colors.Transparent), BorderBrush = new SolidColorBrush(Colors.Transparent), Padding = new Thickness(8, 4, 6, 4) };
         ToolTipService.SetToolTip(_signButton, "Sign");
         _signButton.Flyout = new Flyout();
         _signButton.Flyout.Opening += (_, _) => BuildSignatureFlyout((Flyout)_signButton.Flyout);
@@ -181,12 +181,13 @@ public sealed partial class MainWindow
         if (DocView.SelectedItem is { } item)
         {
             var s = DocView.CurrentStyle;
+            double k = DocView.SelectedStyleScale;
             switch (item)
             {
-                case ShapeMarkup sh: s.Stroke = sh.Color; s.Fill = sh.Fill; s.StrokeWidth = sh.StrokeWidth; break;
-                case LineMarkup l: s.Stroke = l.Color; s.StrokeWidth = l.StrokeWidth; break;
-                case InkMarkup { IsSignature: false } ink: s.Stroke = ink.Color; s.StrokeWidth = ink.StrokeWidth; break;
-                case TextBoxMarkup tb: s.TextColor = tb.Color; s.FontSize = tb.FontSize; s.Font = tb.Font; s.Fill = tb.Fill; break;
+                case ShapeMarkup sh: s.Stroke = sh.Color; s.Fill = sh.Fill; s.StrokeWidth = sh.StrokeWidth / k; break;
+                case LineMarkup l: s.Stroke = l.Color; s.StrokeWidth = l.StrokeWidth / k; break;
+                case InkMarkup { IsSignature: false } ink: s.Stroke = ink.Color; s.StrokeWidth = ink.StrokeWidth / k; break;
+                case TextBoxMarkup tb: s.TextColor = tb.Color; s.FontSize = Math.Round(tb.FontSize / k, 1); s.Font = tb.Font; s.Fill = tb.Fill; break;
             }
             SyncStyleSwatches();
         }
@@ -219,7 +220,8 @@ public sealed partial class MainWindow
     private void SetStrokeWidth(double w)
     {
         DocView.CurrentStyle.StrokeWidth = w;
-        DocView.ApplyToSelection(m => { if (m is not (TextBoxMarkup or NoteMarkup or TextMarkup)) m.StrokeWidth = w; }, "Change Line Width");
+        double k = DocView.SelectedStyleScale;
+        DocView.ApplyToSelection(m => { if (m is not (TextBoxMarkup or NoteMarkup or TextMarkup)) m.StrokeWidth = w * k; }, "Change Line Width");
     }
 
     private Flyout BuildWidthFlyout()
@@ -329,7 +331,8 @@ public sealed partial class MainWindow
         {
             if (syncing || double.IsNaN(e.NewValue)) return;
             DocView.CurrentStyle.FontSize = e.NewValue;
-            DocView.ApplyToSelection(m => { if (m is TextBoxMarkup t) t.FontSize = e.NewValue; }, "Change Font Size");
+            double k = DocView.SelectedStyleScale;
+            DocView.ApplyToSelection(m => { if (m is TextBoxMarkup t) t.FontSize = e.NewValue * k; }, "Change Font Size");
         };
         return flyout;
     }

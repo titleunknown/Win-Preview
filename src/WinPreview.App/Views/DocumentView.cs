@@ -101,6 +101,19 @@ public sealed partial class DocumentView : Grid
 
     private double RasterScale => XamlRoot?.RasterizationScale ?? 1;
 
+    /// <summary>
+    /// Style sizes (line widths, font sizes) are in points. On large images a 2 pt line would be a hairline,
+    /// so they're scaled to the picture: 1 for PDFs and small images, larger for big photos.
+    /// </summary>
+    public double StyleScale(int page)
+    {
+        if (_session is not { IsPdf: false } || page < 0 || page >= _session.PageCount) return 1;
+        var g = _session.GetGeometry(page);
+        return Math.Max(1, Math.Max(g.Width, g.Height) / 1000.0);
+    }
+
+    public double SelectedStyleScale => _selected is { } s ? StyleScale(s.Page) : 1;
+
     // ---------------- Session ----------------
 
     public void Attach(DocumentSession session)

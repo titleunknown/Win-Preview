@@ -111,6 +111,19 @@ public unsafe class PdfDocumentTests
     }
 
     [Fact]
+    public void Crop_box_changes_the_visible_page_and_persists()
+    {
+        using var doc = TestPdfs.TextDocument();
+        doc.SetCropBox(0, new RectD(50, 100, 350, 500));
+        var info = doc.GetPageInfo(0);
+        Assert.Equal(300, info.Width, 1);
+        Assert.Equal(400, info.Height, 1);
+        Assert.Equal(new PointD(0, 0), info.UserToDisplay.Apply(new PointD(50, 500)));
+        using var reopened = PdfDocument.Open(TestPdfs.Save(doc));
+        Assert.Equal(300, reopened.GetPageInfo(0).Width, 1);
+    }
+
+    [Fact]
     public void Typing_into_a_form_field_is_saved()
     {
         using var doc = PdfDocument.Open(TestPdfs.FormPdf());

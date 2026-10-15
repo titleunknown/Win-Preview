@@ -45,6 +45,7 @@ public sealed partial class MainWindow
         Add("Save", "", () => _ = SaveAsync(), "Ctrl+S", has);
         Add("Save As…", "", () => _ = SaveAsAsync(), "Ctrl+Shift+S", has);
         Add("Export…", "", () => _ = ExportAsync(), null, has);
+        Add("Print…", "", () => _ = PrintAsync(), "Ctrl+P", has);
         m.Add(new MenuFlyoutSeparator());
         Add(_session?.Undo.UndoName is { } u ? $"Undo {u}" : "Undo", "", Undo, "Ctrl+Z", _session?.Undo.CanUndo == true);
         Add(_session?.Undo.RedoName is { } r ? $"Redo {r}" : "Redo", "", Redo, "Ctrl+Y", _session?.Undo.CanRedo == true);
@@ -160,7 +161,8 @@ public sealed partial class MainWindow
             case VirtualKey.S when ctrl && alt: ToggleSidebar(); break;
             case VirtualKey.S when ctrl && shift: _ = SaveAsAsync(); break;
             case VirtualKey.S when ctrl: _ = SaveAsync(); break;
-            case VirtualKey.W when ctrl: Close(); break;
+            case VirtualKey.W when ctrl: _ = RequestCloseAsync(); break;
+            case VirtualKey.P when ctrl: _ = PrintAsync(); break;
             case VirtualKey.Z when ctrl && shift && !inText: Redo(); break;
             case VirtualKey.Z when ctrl && !inText: Undo(); break;
             case VirtualKey.Y when ctrl && !inText: Redo(); break;
@@ -454,6 +456,22 @@ public sealed partial class MainWindow
             XamlRoot = Root.XamlRoot, Title = "Keyboard Shortcuts", CloseButtonText = "Close",
             Content = new TextBlock { Text = text, FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Cascadia Mono, Consolas"), FontSize = 12, IsTextSelectionEnabled = true },
         }.ShowAsync();
+    }
+
+    // ---------------- Print ----------------
+
+    private async Task PrintAsync()
+    {
+        if (_session == null) return;
+        DocView.CommitInlineEditor();
+        DocView.KillFormFocus();
+        Log.Write("print requested");
+        try { await Printing.PrintAsync(Hwnd, _session); }
+        catch (Exception ex)
+        {
+            Log.Write($"print failed: {ex}");
+            ShowError("Couldn't print", ex.Message);
+        }
     }
 
     // ---------------- Slideshow ----------------
