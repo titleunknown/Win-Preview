@@ -250,13 +250,20 @@ public sealed partial class DocumentView
             Text = draft.Text, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap,
             FontFamily = MarkupVisuals.FontFor(draft.Font), FontSize = Math.Max(4, draft.FontSize * map.Scale),
             Foreground = draft.Color.Brush(),
-            Background = draft.Fill is { } f ? f.Brush() : new SolidColorBrush(Windows.UI.Color.FromArgb(200, 255, 255, 255)),
+            // Clear unless the user chose a fill, so the page shows through while typing (as it will once saved).
+            Background = draft.Fill is { } f ? f.Brush() : new SolidColorBrush(Microsoft.UI.Colors.Transparent),
             BorderBrush = AccentBrush, BorderThickness = new Thickness(1),
             Padding = new Thickness(2 * map.Scale), MinWidth = 20, MinHeight = 0, Width = Math.Max(30, r.Width),
             CornerRadius = new CornerRadius(0),
         };
-        box.Resources["TextControlBackgroundFocused"] = box.Background;
-        box.Resources["TextControlForegroundFocused"] = box.Foreground;
+        // WinUI paints its own fills on hover/focus; keep every state matching the box.
+        foreach (var state in new[] { "", "PointerOver", "Focused", "Disabled" })
+        {
+            box.Resources[$"TextControlBackground{state}"] = box.Background;
+            box.Resources[$"TextControlForeground{state}"] = box.Foreground;
+            box.Resources[$"TextControlBorderBrush{state}"] = AccentBrush;
+        }
+        box.Resources["TextControlBorderThemeThicknessFocused"] = new Thickness(1);
 
         // Like Preview, the box widens as you type until it reaches the page edge, then wraps.
         double minWidth = box.Width, maxWidth = Math.Max(minWidth, pv.Width - r.X - 4);

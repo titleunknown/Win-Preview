@@ -13,6 +13,7 @@ Movable, scalable text boxes that can use any font installed on Windows.
 - Scaling: dragging a corner handle scales the text with the box (Shift keeps proportions), in addition to
   today's resize-and-rewrap.
 - Bold, italic and alignment options.
+- ~~Transparent background while typing~~ (done; ships in the next release).
 
 ### Redaction (permanent black-out)
 A black "redact" mode for the highlighter that permanently removes what's underneath.

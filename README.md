@@ -9,14 +9,31 @@ This is a clean-room implementation. Features are built from Apple's public
 [Preview User Guide](https://support.apple.com/guide/preview/welcome/mac) and observed behavior.
 No Apple code, binaries or artwork are used, and none were decompiled.
 
-## Requirements
+## Install
+
+1. Download the latest `Win-Preview-…-win-x64.zip` from the
+   [Releases page](https://github.com/titleunknown/win-preview/releases/latest).
+2. Unzip it anywhere, for example `C:\Users\<you>\Apps\Win-Preview`.
+3. Run `WinPreview.exe`. To open files with it, drag them onto the window, use **Open With → Choose another app**,
+   or pin it to Start or the taskbar.
+
+It runs on Windows 10 (1809 or later) and Windows 11, x64. Nothing else needs to be installed: the .NET runtime
+and Windows App SDK are included. To uninstall, delete the folder.
+
+The app isn't code-signed yet, so Windows SmartScreen may show "Windows protected your PC" the first time.
+Choose **More info → Run anyway**. Each release lists a SHA-256 checksum you can verify with
+`Get-FileHash Win-Preview-*.zip`.
+
+## Building from source
+
+### Requirements
 
 - Windows 10 1809 or later (Windows 11 recommended)
 - [.NET 10 SDK](https://dotnet.microsoft.com/download): `winget install Microsoft.DotNet.SDK.10`
 
 You don't need Visual Studio. Everything builds with the `dotnet` CLI.
 
-## Build, test, run
+### Build, test, run
 
 ```bash
 dotnet build src/WinPreview.App -p:Platform=x64
