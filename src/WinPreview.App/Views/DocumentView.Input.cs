@@ -572,6 +572,8 @@ public sealed partial class DocumentView
 
         if (_formPage >= 0 && _session.Pdf is { } pdf)
         {
+            // Ctrl+Shift combinations are window commands (e.g. Ctrl+Shift+A for the markup toolbar).
+            if (ctrl && IsDown(VirtualKey.Shift)) return;
             switch (e.Key)
             {
                 case VirtualKey.Escape:
