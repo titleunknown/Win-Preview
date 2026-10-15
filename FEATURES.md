@@ -41,7 +41,7 @@ Organized by the chapters of Apple's [Preview User Guide](https://support.apple.
 | Add, delete, move and rotate pages | ✅ | All undoable. |
 | Crop PDF pages | ✅ | Rectangular selection, then Ctrl+K (sets the CropBox). |
 | Quartz filter effects | ⬜ | |
-| Redaction | ⬜ | |
+| Redaction | ⬜ | Planned; see [ROADMAP.md](ROADMAP.md). |
 
 ## Edit images
 
