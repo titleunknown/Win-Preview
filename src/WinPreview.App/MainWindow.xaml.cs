@@ -19,7 +19,7 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        Title = "Win Preview";
+        Title = "Win-Preview";
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(DragRegion);
         AppWindow.TitleBar.PreferredHeightOption = TitleBarHeightOption.Tall;
@@ -147,9 +147,9 @@ public sealed partial class MainWindow : Window
             Sidebar.Visibility = Visibility.Collapsed;
             SidebarColumn.Width = new GridLength(0);
         }
-        string name = _session?.DisplayName ?? "Win Preview";
+        string name = _session?.DisplayName ?? "Win-Preview";
         TitleText.Text = _session?.IsDirty == true ? $"{name} — Edited" : name;
-        Title = _session != null ? $"{name} - Win Preview" : "Win Preview";
+        Title = _session != null ? $"{name} - Win-Preview" : "Win-Preview";
         SearchBox.IsEnabled = _session?.IsPdf == true;
         HighlightButton.IsEnabled = _session?.IsPdf == true;
         UpdateSubtitle();

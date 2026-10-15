@@ -1,7 +1,9 @@
-# Win Preview
+# Win-Preview
 
-A Windows app for viewing and marking up PDFs and images, modeled on macOS Preview.
+A free Windows app for viewing and marking up PDFs and images, inspired by macOS Preview.
 Built with C#, WinUI 3 (Windows App SDK) and PDFium.
+
+Win-Preview is an independent project, not affiliated with or endorsed by Apple Inc.
 
 This is a clean-room implementation. Features are built from Apple's public
 [Preview User Guide](https://support.apple.com/guide/preview/welcome/mac) and observed behavior.
@@ -54,3 +56,20 @@ For diagnostics, set `WINPREVIEW_LOG=1` and the app appends to `%TEMP%\winprevie
   the same in a PNG as in a PDF.
 
 See [FEATURES.md](FEATURES.md) for parity status against Preview.
+
+## License
+
+Copyright (C) 2026 titleunknown
+
+Win-Preview is free software: you can redistribute it and/or modify it under the terms of the
+GNU General Public License as published by the Free Software Foundation, version 3 or (at your option)
+any later version. It is distributed WITHOUT ANY WARRANTY. See [LICENSE](LICENSE) for details.
+
+**Additional permission under GNU GPL version 3 section 7:** if you modify this program, or any
+covered work, by linking or combining it with the Microsoft Windows App SDK, the .NET runtime, or
+Windows system components (or modified versions of those libraries), containing parts covered by the
+terms of their respective licenses, the licensors of this program grant you additional permission to
+convey the resulting work.
+
+The name "Win-Preview" and the app icon are not covered by the GPL; see [TRADEMARKS.md](TRADEMARKS.md).
+Third-party components are listed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).

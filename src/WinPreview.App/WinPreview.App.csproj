@@ -15,7 +15,8 @@
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
-    <Product>Win Preview</Product>
+    <Product>Win-Preview</Product>
+    <Copyright>Copyright (C) 2026 titleunknown. GPL-3.0-or-later.</Copyright>
     <Version>0.1.0</Version>
   </PropertyGroup>
   <ItemGroup>
