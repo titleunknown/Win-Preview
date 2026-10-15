@@ -22,7 +22,8 @@ and Windows App SDK are included. To uninstall, delete the folder.
 
 The app isn't code-signed yet, so Windows SmartScreen may show "Windows protected your PC" the first time.
 Choose **More info → Run anyway**. Each release lists a SHA-256 checksum you can verify with
-`Get-FileHash Win-Preview-*.zip`.
+`Get-FileHash Win-Preview-*.zip`. Signing through SignPath Foundation is being set up; see
+[docs/CODE_SIGNING.md](docs/CODE_SIGNING.md).
 
 ## Building from source
 
@@ -73,6 +74,22 @@ For diagnostics, set `WINPREVIEW_LOG=1` and the app appends to `%TEMP%\winprevie
   the same in a PNG as in a PDF.
 
 See [FEATURES.md](FEATURES.md) for parity status against Preview.
+
+## Privacy
+
+Win-Preview does not collect, store or send any information about you or your documents, and it contains no
+analytics or telemetry. Everything, including text recognition, background removal and PDF compression, runs on
+your PC.
+
+The program doesn't transfer information to other networked systems unless you specifically ask it to. The only
+network access is the optional **high-quality background-removal model**: if you choose it, the app asks first and
+then downloads one file (about 179 MB) from GitHub. Nothing about you or your files is sent with that request.
+Saved signatures (`%LOCALAPPDATA%\WinPreview`) and the downloaded model (`%LOCALAPPDATA%\Win-Preview`) stay on
+your PC.
+
+Passwords you enter are kept in memory only. To encrypt a PDF, the app passes the password to the bundled qpdf tool
+through a short-lived temporary file (not the command line, so other programs can't see it in the process list),
+which is deleted as soon as qpdf finishes.
 
 ## License
 

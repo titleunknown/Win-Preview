@@ -101,6 +101,7 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
                 <SelectorBar x:Name="SidebarSelector" SelectionChanged="SidebarSelector_SelectionChanged" Margin="2,0">
                     <SelectorBarItem x:Name="ThumbsTab" ToolTipService.ToolTip="Thumbnails (Ctrl+Alt+2)" IsSelected="True">
@@ -176,6 +177,28 @@
                         </ListView.ItemTemplate>
                     </ListView>
                 </Grid>
+
+                <!-- Page actions: add and remove pages -->
+                <Border x:Name="PageActions" Grid.Row="2" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,1,0,0" Padding="6,4">
+                    <StackPanel Orientation="Horizontal" Spacing="2" HorizontalAlignment="Center">
+                        <DropDownButton x:Name="AddPageButton" Style="{StaticResource ToolButtonStyle}" ToolTipService.ToolTip="Add a page">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon Glyph="&#xE710;" FontSize="14" />
+                                <TextBlock x:Name="AddPageLabel" Text="Add Page" FontSize="12" />
+                                <FontIcon Glyph="&#xE70D;" FontSize="8" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <DropDownButton.Flyout>
+                                <MenuFlyout x:Name="AddPageMenu" Placement="TopEdgeAlignedLeft" />
+                            </DropDownButton.Flyout>
+                        </DropDownButton>
+                        <Button x:Name="RemovePageButton" Style="{StaticResource ToolButtonStyle}" Click="RemovePage_Click" ToolTipService.ToolTip="Remove the selected pages (Delete)">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon Glyph="&#xE738;" FontSize="14" />
+                                <TextBlock x:Name="RemovePageLabel" Text="Remove" FontSize="12" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Border>
             </Grid>
 
             <views:DocumentView x:Name="DocView" Grid.Column="1" />

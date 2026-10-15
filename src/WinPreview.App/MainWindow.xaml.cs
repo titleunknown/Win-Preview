@@ -15,6 +15,8 @@ public sealed partial class MainWindow : Window
     private DocumentSession? _session;
     private readonly SignatureStore _signatures = new();
     private bool _closeConfirmed;
+    /// <summary>Completes once the window content is loaded; dialogs (e.g. the password prompt) need a XamlRoot.</summary>
+    private readonly TaskCompletionSource _loaded = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     public MainWindow()
     {
@@ -29,6 +31,7 @@ public sealed partial class MainWindow : Window
             double scale = Root.XamlRoot.RasterizationScale;
             AppWindow.Resize(new SizeInt32((int)(1180 * scale), (int)(860 * scale)));
             UpdateCaptionInset();
+            _loaded.TrySetResult();
         };
         Root.SizeChanged += (_, _) => UpdateCaptionInset();
         AppWindow.Closing += OnClosing;
@@ -59,6 +62,7 @@ public sealed partial class MainWindow : Window
     {
         try
         {
+            await _loaded.Task; // a file given on the command line is opened before the window has loaded
             DocumentSession session;
             if (files.Count > 1 && files.All(ImageCodec.IsImage))
             {
@@ -86,6 +90,7 @@ public sealed partial class MainWindow : Window
         if (_session != null)
         {
             _session.DirtyChanged -= UpdateChrome;
+            _session.EncryptionChanged -= UpdateChrome;
             _session.StructureChanged -= OnStructureChanged;
             _session.MarkupsChanged -= OnMarkupsChanged;
             _session.Undo.Changed -= UpdateChrome;
@@ -94,11 +99,14 @@ public sealed partial class MainWindow : Window
         }
         _session = session;
         session.DirtyChanged += UpdateChrome;
+        session.EncryptionChanged += UpdateChrome;
         session.StructureChanged += OnStructureChanged;
         session.MarkupsChanged += OnMarkupsChanged;
         session.Undo.Changed += UpdateChrome;
         ClearSearch();
         DocView.Tool = Tool.Select;
+        // Like Preview, a single image opens without the sidebar; the sidebar button shows it.
+        _sidebarVisible = session.IsPdf || session.PageCount > 1;
         DocView.Attach(session);
         RebuildSidebar();
         UpdateChrome();
@@ -163,7 +171,7 @@ public sealed partial class MainWindow : Window
         if (_session == null) { SubtitleText.Text = ""; return; }
         string zoom = $"{Math.Round(DocView.Zoom * 100)}%";
         if (_session.IsPdf)
-            SubtitleText.Text = $"Page {DocView.CurrentPage + 1} of {_session.PageCount} · {zoom}";
+            SubtitleText.Text = $"Page {DocView.CurrentPage + 1} of {_session.PageCount} · {zoom}" + (_session.Encryption != null ? " · 🔒 Password protected" : "");
         else
         {
             var f = _session.Pages[Math.Clamp(DocView.CurrentPage, 0, _session.PageCount - 1)].Frame!;

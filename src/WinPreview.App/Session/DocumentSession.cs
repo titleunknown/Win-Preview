@@ -82,7 +82,10 @@ public sealed class DocumentSession : IDisposable
                 try
                 {
                     var pdf = await Task.Run(() => PdfDocument.Open(path, password));
-                    return FromPdf(pdf, path);
+                    var session = FromPdf(pdf, path);
+                    // A PDF opened with a password stays protected with that password when saved, like Preview.
+                    if (password != null) session.Encryption = new PdfEncryption(password);
+                    return session;
                 }
                 catch (PdfPasswordException e)
                 {
@@ -319,13 +322,22 @@ public sealed class DocumentSession : IDisposable
     /// <summary>Runs a structural edit with whole-document snapshot undo.</summary>
     private void Structural(string name, Action edit)
     {
-        var before = TakeSnapshot();
-        edit();
-        ResetGeometry();
-        var after = TakeSnapshot();
-        MarkDirty();
-        StructureChanged?.Invoke();
-        Undo.Push(name, () => Restore(before), () => Restore(after));
+        try
+        {
+            var before = TakeSnapshot();
+            edit();
+            ResetGeometry();
+            var after = TakeSnapshot();
+            MarkDirty();
+            StructureChanged?.Invoke();
+            Undo.Push(name, () => Restore(before), () => Restore(after));
+            Log.Write($"structural '{name}' ok, pages={Pages.Count}");
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"structural '{name}' FAILED: {ex}");
+            throw;
+        }
     }
 
     public void RotatePages(IReadOnlyList<int> pages, bool clockwise)
@@ -482,7 +494,75 @@ public sealed class DocumentSession : IDisposable
 
     public bool HasTransparency => Pages.Any(p => p.Frame != null && Core.Imaging.AlphaTools.HasTransparency(p.Frame.Pixels));
 
+    // ---------------- Password protection ----------------
+
+    /// <summary>The password protection applied whenever this PDF is saved, or null for none.</summary>
+    public PdfEncryption? Encryption { get; private set; }
+
+    public event Action? EncryptionChanged;
+
+    /// <summary>Sets or removes password protection. It takes effect on the next save or export.</summary>
+    public void SetEncryption(PdfEncryption? encryption)
+    {
+        if (!IsPdf) return;
+        var before = Encryption;
+        Apply(encryption);
+        Undo.Push(encryption == null ? "Remove Password" : "Password Protect", () => Apply(before), () => Apply(encryption));
+
+        void Apply(PdfEncryption? value)
+        {
+            Encryption = value;
+            MarkDirty();
+            EncryptionChanged?.Invoke();
+        }
+    }
+
     // ---------------- Saving & exporting ----------------
+
+    /// <summary>The PDF as it would be saved, markups included, without password protection.</summary>
+    public async Task<byte[]> BuildPdfBytesAsync()
+    {
+        if (Pdf is { } pdf)
+        {
+            var map = MarkupMap();
+            return await Task.Run(() =>
+            {
+                using var ms = new MemoryStream();
+                pdf.Save(ms, map, removeSecurity: true); // protection is re-applied by qpdf below
+                return ms.ToArray();
+            });
+        }
+        var frames = await Task.Run(FlattenedFrames);
+        return await Task.Run(() =>
+        {
+            using var pdf = PdfDocument.CreateEmpty();
+            foreach (var f in frames)
+                pdf.AddImagePage(f.Pixels, f.Width, f.Height, f.Width * 72 / f.DpiX, f.Height * 72 / f.DpiY);
+            using var ms = new MemoryStream();
+            pdf.Save(ms);
+            return ms.ToArray();
+        });
+    }
+
+    /// <summary>Runs the compressor on the current document; nothing on disk or in the session changes.</summary>
+    public async Task<CompressionResult> CompressAsync(CompressionLevel level, IProgress<double>? progress, CancellationToken ct) =>
+        await PdfCompressor.CompressAsync(await BuildPdfBytesAsync(), level, progress, ct);
+
+    /// <summary>Writes already-built PDF bytes to a file, applying this document's password protection. Atomic.</summary>
+    public async Task WritePdfAsync(byte[] pdf, string path)
+    {
+        if (Encryption is { } enc) pdf = await Qpdf.EncryptAsync(pdf, enc);
+        string tmp = path + ".wptmp";
+        try
+        {
+            await File.WriteAllBytesAsync(tmp, pdf);
+            File.Move(tmp, path, overwrite: true);
+        }
+        finally
+        {
+            if (File.Exists(tmp)) File.Delete(tmp);
+        }
+    }
 
     private Dictionary<int, IReadOnlyList<MarkupItem>> MarkupMap() =>
         Pages.Select((p, i) => (p, i)).Where(t => t.p.Markups.Count > 0)
@@ -513,36 +593,20 @@ public sealed class DocumentSession : IDisposable
     public async Task ExportAsync(string path, double quality = 0.9, double rasterDpi = 150)
     {
         string ext = Path.GetExtension(path).ToLowerInvariant();
+        if (ext == ".pdf")
+        {
+            await WritePdfAsync(await BuildPdfBytesAsync(), path);
+            return;
+        }
+
         string tmp = path + ".wptmp";
         try
         {
             await using (var fs = File.Create(tmp))
             {
-                if (ext == ".pdf")
-                {
-                    if (Pdf != null)
-                    {
-                        var map = MarkupMap();
-                        await Task.Run(() => Pdf.Save(fs, map));
-                    }
-                    else
-                    {
-                        var frames = await Task.Run(FlattenedFrames);
-                        await Task.Run(() =>
-                        {
-                            using var pdf = PdfDocument.CreateEmpty();
-                            foreach (var f in frames)
-                                pdf.AddImagePage(f.Pixels, f.Width, f.Height, f.Width * 72 / f.DpiX, f.Height * 72 / f.DpiY);
-                            pdf.Save(fs);
-                        });
-                    }
-                }
-                else
-                {
-                    var format = ImageCodec.FormatForExtension(ext) ?? throw new NotSupportedException($"Can't save {ext} files.");
-                    var frames = Pdf != null ? await RasterizePdfAsync(rasterDpi) : await Task.Run(FlattenedFrames);
-                    await ImageCodec.EncodeAsync(fs, format, frames, quality);
-                }
+                var format = ImageCodec.FormatForExtension(ext) ?? throw new NotSupportedException($"Can't save {ext} files.");
+                var frames = Pdf != null ? await RasterizePdfAsync(rasterDpi) : await Task.Run(FlattenedFrames);
+                await ImageCodec.EncodeAsync(fs, format, frames, quality);
             }
             File.Move(tmp, path, overwrite: true);
         }

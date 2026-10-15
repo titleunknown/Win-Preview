@@ -4,6 +4,39 @@ using System.Drawing.Drawing2D;
 using System.Text;
 using WinPreview.Core.Pdf;
 
+if (args is ["compress", var inPdf, var outPdf, var levelArg])
+{
+    // Runs the same compressor the app uses and reports the result.
+    var bytes = File.ReadAllBytes(inPdf);
+    var res = await PdfCompressor.CompressAsync(bytes, Enum.Parse<CompressionLevel>(levelArg, ignoreCase: true));
+    File.WriteAllBytes(outPdf, res.Pdf);
+    Console.WriteLine($"{res.BeforeBytes:N0} -> {res.AfterBytes:N0} bytes ({res.Saved:P0} smaller), images recompressed: {res.ImagesRecompressed}, fell back: {res.FellBackToLossless}");
+    return;
+}
+
+if (args is ["photo-pdf", var photoOut, var transparentArg])
+{
+    // A one-page PDF holding a large photo-like image, optionally with a transparent half (soft mask).
+    int w = 1800, h = 2200;
+    var px = new byte[w * h * 4];
+    var rng = new Random(42);
+    for (int y = 0; y < h; y++)
+        for (int x = 0; x < w; x++)
+        {
+            int i = (y * w + x) * 4;
+            px[i] = (byte)Math.Clamp(128 + 90 * Math.Sin(x / (double)w * 9) + rng.Next(-7, 8), 0, 255);
+            px[i + 1] = (byte)Math.Clamp(128 + 90 * Math.Sin(y / (double)h * 7) + rng.Next(-7, 8), 0, 255);
+            px[i + 2] = (byte)Math.Clamp(128 + 90 * Math.Cos((x - y) / (double)w * 5) + rng.Next(-7, 8), 0, 255);
+            px[i + 3] = bool.Parse(transparentArg) && x < w / 2 ? (byte)0 : (byte)255;
+        }
+    using var d = PdfDocument.CreateEmpty();
+    d.AddImagePage(px, w, h, 612, 792);
+    using var fs = File.Create(photoOut);
+    d.Save(fs);
+    Console.WriteLine($"Wrote {photoOut}");
+    return;
+}
+
 if (args is ["render", var pdfPath, var pageArg, var pngPath])
 {
     // Renders a page with plain PDFium (annotations via their appearance streams), as any other viewer would.

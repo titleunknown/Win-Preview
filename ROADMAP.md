@@ -2,6 +2,21 @@
 
 Planned work, roughly in priority order. [FEATURES.md](FEATURES.md) tracks parity with macOS Preview.
 
+## Next release (v0.2), in the repository now
+
+- Password protection for PDFs (AES-256), with an optional permissions password
+- Reduce File Size (lossless, balanced and smallest)
+- Add Page / Remove buttons in the sidebar
+- Text boxes have a transparent background while typing
+- Fix: password-protected PDFs given on the command line failed to open
+
+## In progress
+
+### Code signing
+Signing releases through SignPath Foundation to remove the SmartScreen warning. The build pipeline and
+configuration are in place; the application to SignPath and the first signed release are next.
+See [docs/CODE_SIGNING.md](docs/CODE_SIGNING.md).
+
 ## To do
 
 ### Text boxes with system fonts
@@ -13,7 +28,6 @@ Movable, scalable text boxes that can use any font installed on Windows.
 - Scaling: dragging a corner handle scales the text with the box (Shift keeps proportions), in addition to
   today's resize-and-rewrap.
 - Bold, italic and alignment options.
-- ~~Transparent background while typing~~ (done; ships in the next release).
 
 ### Redaction (permanent black-out)
 A black "redact" mode for the highlighter that permanently removes what's underneath.

@@ -472,8 +472,10 @@ public sealed unsafe class PdfDocument : IDisposable
     /// <summary>
     /// Writes the document. <paramref name="markups"/> are added as real PDF annotations in the saved
     /// file but removed again from the in-memory document, which keeps rendering them as an overlay.
+    /// The output is always written unencrypted: callers that want password protection apply it afterwards
+    /// with <see cref="Qpdf.EncryptAsync"/>, and in-memory copies (undo snapshots, printing) stay reopenable.
     /// </summary>
-    public void Save(Stream output, IReadOnlyDictionary<int, IReadOnlyList<Markup.MarkupItem>>? markups = null, bool removeSecurity = false)
+    public void Save(Stream output, IReadOnlyDictionary<int, IReadOnlyList<Markup.MarkupItem>>? markups = null, bool removeSecurity = true)
     {
         lock (Pdfium.Lock)
         {

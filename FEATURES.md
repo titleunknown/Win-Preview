@@ -38,7 +38,7 @@ Organized by the chapters of Apple's [Preview User Guide](https://support.apple.
 | Sketch (shape recognition) and Draw | 🟡 | Freehand Draw is done; Sketch's shape recognition isn't. |
 | Text boxes | ✅ | Grows as you type. Helvetica, Times or Courier, with size and color. |
 | Combine PDFs | ✅ | Insert from file, or drop files on the thumbnails. |
-| Add, delete, move and rotate pages | ✅ | All undoable. |
+| Add, delete, move and rotate pages | ✅ | Add Page and Remove buttons under the thumbnails (blank page or pages from a file), plus drag to reorder. All undoable. |
 | Crop PDF pages | ✅ | Rectangular selection, then Ctrl+K (sets the CropBox). |
 | Quartz filter effects | ⬜ | |
 | Redaction | ⬜ | Planned; see [ROADMAP.md](ROADMAP.md). |
@@ -67,8 +67,8 @@ Organized by the chapters of Apple's [Preview User Guide](https://support.apple.
 | Undo and redo | ✅ | All markup and page edits. |
 | Revert to earlier versions | ⬜ | |
 | Duplicate, lock | ⬜ | |
-| Password-protect a PDF | ⬜ | PDFium can't write encryption; needs qpdf or similar. Opening encrypted PDFs works. |
-| Reduce file size | ⬜ | |
+| Password-protect a PDF | ✅ | AES-256 via the bundled qpdf. Optional permissions password to restrict printing, copying and editing. Applied on save; opened protected PDFs keep their password when saved. Change or remove it from the More menu. |
+| Reduce file size | ✅ | PDFs only. Balanced, Smallest or Lossless; saves a smaller copy. Images are downsampled and re-encoded as JPEG, except images with transparency. The result is checked against the original and falls back to lossless if pages would look different. |
 | New from clipboard | ✅ | Ctrl+N. |
 | 3D files (USDZ and others) | ⬜ | |
 | Settings | ⬜ | |

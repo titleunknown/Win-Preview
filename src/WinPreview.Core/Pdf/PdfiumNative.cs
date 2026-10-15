@@ -82,6 +82,39 @@ internal static unsafe partial class PdfiumNative
     [LibraryImport(Lib)] public static partial int FPDFPageObj_SetLineCap(nint obj, int cap);
     [LibraryImport(Lib)] public static partial int FPDFPageObj_SetLineJoin(nint obj, int join);
 
+    // ---- fpdf_edit.h: page objects and images (used by PDF compression) ----
+    public const int FPDF_PAGEOBJ_IMAGE = 3, FPDF_PAGEOBJ_FORM = 5;
+    public const int FPDFBitmap_Gray = 1, FPDFBitmap_BGR = 2, FPDFBitmap_BGRx = 3;
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct FS_MATRIX { public float A, B, C, D, E, F; }
+
+    /// <summary>FPDF_FILEACCESS. Note that C's <c>unsigned long</c> is 32-bit on Windows.</summary>
+    [StructLayout(LayoutKind.Sequential)]
+    public struct FPDF_FILEACCESS
+    {
+        public uint FileLen;
+        public delegate* unmanaged[Cdecl]<void*, uint, byte*, uint, int> GetBlock;
+        public void* Param;
+    }
+
+    [LibraryImport(Lib)] public static partial int FPDFPage_CountObjects(nint page);
+    [LibraryImport(Lib)] public static partial nint FPDFPage_GetObject(nint page, int index);
+    [LibraryImport(Lib)] public static partial int FPDFPageObj_GetType(nint obj);
+    [LibraryImport(Lib)] public static partial int FPDFFormObj_CountObjects(nint formObj);
+    [LibraryImport(Lib)] public static partial nint FPDFFormObj_GetObject(nint formObj, uint index);
+    [LibraryImport(Lib)] public static partial int FPDFPageObj_GetMatrix(nint obj, FS_MATRIX* matrix);
+    [LibraryImport(Lib)] public static partial int FPDFImageObj_GetImagePixelSize(nint obj, uint* width, uint* height);
+    [LibraryImport(Lib)] public static partial uint FPDFImageObj_GetImageDataRaw(nint obj, void* buffer, uint bufLen);
+    [LibraryImport(Lib)] public static partial nint FPDFImageObj_GetBitmap(nint obj);
+    [LibraryImport(Lib)] public static partial nint FPDFImageObj_GetRenderedBitmap(nint doc, nint page, nint obj);
+    [LibraryImport(Lib)] public static partial int FPDFImageObj_LoadJpegFileInline(nint* pages, int count, nint obj, FPDF_FILEACCESS* file);
+    [LibraryImport(Lib)] public static partial int FPDFBitmap_GetFormat(nint bitmap);
+    [LibraryImport(Lib)] public static partial int FPDFBitmap_GetWidth(nint bitmap);
+    [LibraryImport(Lib)] public static partial int FPDFBitmap_GetHeight(nint bitmap);
+    [LibraryImport(Lib)] public static partial int FPDFBitmap_GetStride(nint bitmap);
+    [LibraryImport(Lib)] public static partial void* FPDFBitmap_GetBuffer(nint bitmap);
+
     // ---- fpdf_transformpage.h ----
     [LibraryImport(Lib)] public static partial void FPDFPage_SetCropBox(nint page, float left, float bottom, float right, float top);
 

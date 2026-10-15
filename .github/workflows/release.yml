@@ -1,0 +1,129 @@
+name: Release
+
+# Builds Win-Preview on a GitHub-hosted runner, signs it with SignPath when that's configured, and attaches
+# the zip to a draft GitHub release. See docs/CODE_SIGNING.md.
+#
+#   git tag v0.2 && git push origin v0.2        -> builds, signs (if configured) and drafts the release
+#   Actions → Release → Run workflow            -> builds a test package and uploads it as a workflow artifact
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: write # create the draft release
+      actions: read   # lets SignPath read this run's artifact
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+      # Signing turns on once the SignPath repository variables exist (docs/CODE_SIGNING.md).
+      SIGNING_CONFIGURED: ${{ vars.SIGNPATH_ORGANIZATION_ID != '' && vars.SIGNPATH_PROJECT_SLUG != '' }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Work out the version
+        id: ver
+        shell: pwsh
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          $tag = if ($env:REF_TYPE -eq 'tag') { $env:REF_NAME } else { 'v0.0.0-dev' }
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          "version=$($tag.TrimStart('v'))" >> $env:GITHUB_OUTPUT
+
+      - name: Test
+        run: dotnet test tests/WinPreview.Core.Tests -c Release --nologo
+
+      - name: Publish (self-contained, x64)
+        run: >
+          dotnet publish src/WinPreview.App -c Release -p:Platform=x64 -r win-x64
+          --self-contained true -p:PublishReadyToRun=true
+          -p:Version=${{ steps.ver.outputs.version }} -o publish --nologo
+
+      - name: Add license files, drop debug symbols
+        shell: pwsh
+        run: |
+          Copy-Item LICENSE, THIRD-PARTY-NOTICES.md, TRADEMARKS.md publish/
+          Get-ChildItem publish -Recurse -Filter *.pdb | Remove-Item -Force
+
+      # SignPath needs the unsigned files as a GitHub workflow artifact (a zip with the files at its root).
+      - name: Upload unsigned build
+        id: upload-unsigned
+        uses: actions/upload-artifact@v7
+        with:
+          name: unsigned-win-x64
+          path: publish
+
+      - name: Sign with SignPath
+        if: ${{ env.SIGNING_CONFIGURED == 'true' }}
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG || 'release-signing' }}
+          artifact-configuration-slug: ${{ vars.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG || 'initial' }}
+          github-artifact-id: ${{ steps.upload-unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 7200 # a person approves each release in SignPath
+          output-artifact-directory: signed
+
+      - name: Package
+        id: pack
+        shell: pwsh
+        env:
+          TAG: ${{ steps.ver.outputs.tag }}
+        run: |
+          $source = if ($env:SIGNING_CONFIGURED -eq 'true') { 'signed' } else { 'publish' }
+          $zip = "Win-Preview-$env:TAG-win-x64.zip"
+          New-Item -ItemType Directory -Force stage/Win-Preview | Out-Null
+          Copy-Item "$source/*" stage/Win-Preview -Recurse -Force
+          Compress-Archive -Path stage/Win-Preview -DestinationPath $zip -CompressionLevel Optimal
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+          "$hash  $zip" | Out-File -Encoding ascii "$zip.sha256"
+          "zip=$zip" >> $env:GITHUB_OUTPUT
+
+      - name: Verify signatures (when signed)
+        if: ${{ env.SIGNING_CONFIGURED == 'true' }}
+        shell: pwsh
+        run: |
+          foreach ($f in 'WinPreview.exe', 'WinPreview.dll', 'WinPreview.Core.dll') {
+            $s = Get-AuthenticodeSignature "stage/Win-Preview/$f"
+            "$f : $($s.Status)"
+            if ($s.Status -ne 'Valid') { throw "$f is not validly signed ($($s.Status))" }
+          }
+
+      - name: Keep the package as a workflow artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.pack.outputs.zip }}
+          path: |
+            ${{ steps.pack.outputs.zip }}
+            ${{ steps.pack.outputs.zip }}.sha256
+
+      - name: Draft the GitHub release
+        if: ${{ github.ref_type == 'tag' }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.ver.outputs.tag }}
+          ZIP: ${{ steps.pack.outputs.zip }}
+        run: |
+          gh release view $env:TAG *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $env:TAG $env:ZIP "$env:ZIP.sha256" --clobber
+          } else {
+            gh release create $env:TAG $env:ZIP "$env:ZIP.sha256" --draft --title "Win-Preview $env:TAG" --generate-notes
+          }

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SignPath artifact configuration for Win-Preview.
+  Upload this file to the project in SignPath (Artifact configurations → Add) and name it "initial".
+
+  Only binaries built from this repository are signed. Third-party DLLs in the package (Microsoft's .NET runtime
+  and Windows App SDK, ONNX Runtime, PDFium, qpdf) keep their original publishers' signatures or are left as-is;
+  they must never be signed under our certificate.
+-->
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <zip-file>
+    <pe-file path="WinPreview.exe" product-name="Win-Preview" company-name="Win-Preview contributors">
+      <authenticode-sign />
+    </pe-file>
+    <pe-file path="WinPreview.dll" product-name="Win-Preview" company-name="Win-Preview contributors">
+      <authenticode-sign />
+    </pe-file>
+    <pe-file path="WinPreview.Core.dll" product-name="Win-Preview" company-name="Win-Preview contributors">
+      <authenticode-sign />
+    </pe-file>
+  </zip-file>
+</artifact-configuration>

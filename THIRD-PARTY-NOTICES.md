@@ -40,6 +40,15 @@ are published with the binary builds at <https://github.com/bblanchon/pdfium-bin
 Copyright © Benoît Blanchon. Licensed under the Apache License 2.0
 (<https://www.apache.org/licenses/LICENSE-2.0>).
 
+## qpdf
+
+<https://github.com/qpdf/qpdf> (version 12.4.2, `qpdf\` folder next to the app): used as a separate program to
+encrypt PDFs and to repack them losslessly. Copyright (c) 2005-2021 Jay Berkenbilt, (c) 2022-2026 Jay Berkenbilt and
+Manfred Holger. Licensed under the Apache License 2.0 (<https://www.apache.org/licenses/LICENSE-2.0>).
+The unmodified Windows build is vendored in `third_party/qpdf`; its SHA-256 is recorded in `third_party/qpdf/README.txt`.
+It is accompanied by the Microsoft Visual C++ runtime DLLs (`msvcp140*.dll`, `vcruntime140*.dll`, `concrt140.dll`),
+which are redistributable under Microsoft's Visual C++ Redistributable license terms.
+
 ## Windows App SDK
 
 <https://github.com/microsoft/WindowsAppSDK>: the WinUI 3 runtime bundled with the app.

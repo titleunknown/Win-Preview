@@ -38,7 +38,7 @@ public sealed partial class MainWindow
 
     private void ApplySidebarVisibility()
     {
-        bool show = _sidebarVisible && _session != null && (_session.PageCount > 1 || _session.IsPdf || ResultsPanel.Visibility == Visibility.Visible);
+        bool show = _sidebarVisible && _session != null;
         Sidebar.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
         SidebarColumn.Width = new GridLength(show ? 210 : 0);
     }
@@ -58,6 +58,7 @@ public sealed partial class MainWindow
     private void SyncSidebarPanels(SelectorBarItem? sel)
     {
         ThumbList.Visibility = sel == ThumbsTab ? Visibility.Visible : Visibility.Collapsed;
+        PageActions.Visibility = sel == ThumbsTab ? Visibility.Visible : Visibility.Collapsed;
         TocTree.Visibility = sel == TocTab ? Visibility.Visible : Visibility.Collapsed;
         NotesList.Visibility = sel == NotesTab ? Visibility.Visible : Visibility.Collapsed;
         ResultsPanel.Visibility = sel == ResultsTab ? Visibility.Visible : Visibility.Collapsed;
@@ -68,12 +69,35 @@ public sealed partial class MainWindow
         RebuildThumbnails();
         RebuildToc();
         RebuildNotes();
+        UpdatePageActions();
         bool pdf = _session?.IsPdf == true;
         TocTab.Visibility = pdf ? Visibility.Visible : Visibility.Collapsed;
         NotesTab.Visibility = pdf ? Visibility.Visible : Visibility.Collapsed;
         if (!pdf && !ThumbsTab.IsSelected) SidebarSelector.SelectedItem = ThumbsTab;
         ApplySidebarVisibility();
     }
+
+    // ---------------- Add / remove pages ----------------
+
+    private void UpdatePageActions()
+    {
+        bool pdf = _session?.IsPdf == true;
+        string noun = pdf ? "Page" : "Image";
+        AddPageLabel.Text = "Add " + noun;
+        RemovePageLabel.Text = "Remove";
+        ToolTipService.SetToolTip(RemovePageButton, $"Remove the selected {noun.ToLowerInvariant()}s (Delete)");
+        RemovePageButton.IsEnabled = _session is { PageCount: > 1 };
+
+        AddPageMenu.Items.Clear();
+        if (_session == null) return;
+        // New pages go after the selection (or after the page being viewed).
+        int after() => SelectedPages().Max() + 1;
+        if (pdf)
+            AddPageMenu.Items.Add(DocumentView.Item("Blank Page", "", () => _session?.InsertBlankPage(Math.Min(after(), _session.PageCount))));
+        AddPageMenu.Items.Add(DocumentView.Item(pdf ? "Pages from File…" : "Image from File…", "", () => _ = InsertFromFileAsync(after())));
+    }
+
+    private void RemovePage_Click(object sender, RoutedEventArgs e) => DeletePages();
 
     // ---------------- Thumbnails ----------------
 

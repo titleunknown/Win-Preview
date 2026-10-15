@@ -12,6 +12,7 @@ public partial class App : Application
         UnhandledException += (_, e) =>
         {
             e.Handled = true;
+            Log.Write("UNHANDLED: " + e.Exception);
             System.Diagnostics.Debug.WriteLine(e.Exception);
             _windows.LastOrDefault()?.ShowError("Something went wrong", e.Exception.Message);
         };

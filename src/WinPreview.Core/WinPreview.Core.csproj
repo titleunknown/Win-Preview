@@ -1,6 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <!-- Windows TFM: the engine uses Windows' built-in WIC for JPEG encoding (PDF compression). -->
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <RootNamespace>WinPreview.Core</RootNamespace>
   </PropertyGroup>
@@ -9,5 +10,10 @@
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="WinPreview.Core.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- qpdf (Apache-2.0) runs as a child process for PDF encryption and structure optimization.
+         It lands in <output>\qpdf\ for every project that references Core. -->
+    <Content Include="..\..\third_party\qpdf\*" Link="qpdf\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

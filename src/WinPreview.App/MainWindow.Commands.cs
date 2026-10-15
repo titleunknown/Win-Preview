@@ -46,6 +46,11 @@ public sealed partial class MainWindow
         Add("Save As…", "", () => _ = SaveAsAsync(), "Ctrl+Shift+S", has);
         Add("Export…", "", () => _ = ExportAsync(), null, has);
         Add("Print…", "", () => _ = PrintAsync(), "Ctrl+P", has);
+        if (pdf)
+        {
+            Add(_session!.Encryption == null ? "Password Protect…" : "Change or Remove Password…", "", () => _ = PasswordProtectAsync());
+            Add("Reduce File Size…", "", () => _ = ReduceFileSizeAsync());
+        }
         m.Add(new MenuFlyoutSeparator());
         Add(_session?.Undo.UndoName is { } u ? $"Undo {u}" : "Undo", "", Undo, "Ctrl+Z", _session?.Undo.CanUndo == true);
         Add(_session?.Undo.RedoName is { } r ? $"Redo {r}" : "Redo", "", Redo, "Ctrl+Y", _session?.Undo.CanRedo == true);
