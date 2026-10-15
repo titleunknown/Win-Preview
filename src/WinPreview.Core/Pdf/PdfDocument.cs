@@ -166,7 +166,8 @@ public sealed unsafe class PdfDocument : IDisposable
     /// <paramref name="pageWidthPx"/> x <paramref name="pageHeightPx"/>, and the region starting at
     /// (<paramref name="x"/>, <paramref name="y"/>) of size <paramref name="width"/> x <paramref name="height"/> is drawn.
     /// </summary>
-    public void Render(int index, int pageWidthPx, int pageHeightPx, int x, int y, int width, int height, Span<byte> bgra, bool printing = false)
+    public void Render(int index, int pageWidthPx, int pageHeightPx, int x, int y, int width, int height, Span<byte> bgra,
+        bool printing = false, bool transparent = false)
     {
         if (bgra.Length < width * height * 4) throw new ArgumentException("Buffer too small.", nameof(bgra));
         lock (Pdfium.Lock)
@@ -177,7 +178,7 @@ public sealed unsafe class PdfDocument : IDisposable
                 var bmp = FPDFBitmap_CreateEx(width, height, FPDFBitmap_BGRA, buf, width * 4);
                 try
                 {
-                    FPDFBitmap_FillRect(bmp, 0, 0, width, height, 0xFFFFFFFF);
+                    FPDFBitmap_FillRect(bmp, 0, 0, width, height, transparent ? 0u : 0xFFFFFFFF);
                     int flags = FPDF_ANNOT | (printing ? FPDF_PRINTING : 0);
                     FPDF_RenderPageBitmap(bmp, page, -x, -y, pageWidthPx, pageHeightPx, 0, flags);
                     if (_form != 0) FPDF_FFLDraw(_form, bmp, page, -x, -y, pageWidthPx, pageHeightPx, 0, flags);
@@ -349,6 +350,16 @@ public sealed unsafe class PdfDocument : IDisposable
             var page = GetPage(index);
             int quarter = ((FPDFPage_GetRotation(page) + degrees / 90) % 4 + 4) % 4;
             FPDFPage_SetRotation(page, quarter);
+        }
+    }
+
+    /// <summary>Sets the visible area of a page (non-destructive crop, like Preview's PDF crop).</summary>
+    public void SetCropBox(int index, RectD user)
+    {
+        lock (Pdfium.Lock)
+        {
+            FPDFPage_SetCropBox(GetPage(index), (float)user.X1, (float)user.Y1, (float)user.X2, (float)user.Y2);
+            ClosePages(); // the loaded page caches its box; reload so sizes reflect the crop
         }
     }
 

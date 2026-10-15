@@ -1,5 +1,8 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/WinPreview.App/WinPreview.App.csproj">
+      <Platform Project="x64" />
+    </Project>
     <Project Path="src/WinPreview.Core/WinPreview.Core.csproj" />
   </Folder>
   <Folder Name="/tests/">

@@ -82,6 +82,9 @@ internal static unsafe partial class PdfiumNative
     [LibraryImport(Lib)] public static partial int FPDFPageObj_SetLineCap(nint obj, int cap);
     [LibraryImport(Lib)] public static partial int FPDFPageObj_SetLineJoin(nint obj, int join);
 
+    // ---- fpdf_transformpage.h ----
+    [LibraryImport(Lib)] public static partial void FPDFPage_SetCropBox(nint page, float left, float bottom, float right, float top);
+
     // ---- fpdf_ppo.h ----
     [LibraryImport(Lib)] public static partial int FPDF_ImportPagesByIndex(nint dest, nint src, int* indices, nuint length, int index);
 
