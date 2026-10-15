@@ -15,8 +15,8 @@ Organized by the chapters of Apple's [Preview User Guide](https://support.apple.
 | Sidebar: table of contents | ✅ | Built from the PDF outline. |
 | Sidebar: highlights and notes | ✅ | Click an entry to jump to it. |
 | Bookmark PDF pages | ⬜ | |
-| Find text in PDFs | ✅ | Results list with context; Ctrl+G and Enter for next match. |
-| Interact with text in a photo (Live Text) | ⬜ | Planned: `Windows.Media.Ocr`. |
+| Find text in PDFs | ✅ | Results list with context; Ctrl+G and Enter for next match. Also searches recognized text in images. |
+| Interact with text in a photo (Live Text) | ✅ | Windows' built-in on-device OCR. Select, copy, double-click a word and search. Uses the OCR languages installed in Windows. |
 | Inspector (document info) | 🟡 | File, metadata, page size, encryption, form presence, image DPI. No EXIF or GPS tabs yet. |
 | See where a photo was taken | ⬜ | Needs EXIF GPS and a map. |
 | Import images from a camera | ⬜ | |
@@ -53,7 +53,8 @@ Organized by the chapters of Apple's [Preview User Guide](https://support.apple.
 | Annotate images | ✅ | Same tools as PDFs; flattened on save. |
 | Convert file types (Export) | ✅ | PNG, JPEG (with quality), HEIF (needs the codec), TIFF (multi-page), GIF, BMP, JPEG XR, PDF. |
 | Adjust Color | ⬜ | |
-| Remove background / Instant Alpha | ⬜ | Planned: Windows AI image segmentation. |
+| Remove background | ✅ | On-device ML (ONNX Runtime). U²-Net-p is built in; the higher-quality ISNet is an optional 179 MB download. Offers to save as PNG when the format can't store transparency. |
+| Instant Alpha | ✅ | Press on a color and drag to widen the tolerance, with a live preview. Undoable. |
 | Color profiles and soft proofing | ⬜ | Images are converted to sRGB on open. |
 
 ## Share, manage, print, save

@@ -59,7 +59,11 @@ public sealed partial class MainWindow
             m.Add(pages);
         }
         Add("Crop to Selection", "", Crop, "Ctrl+K", DocView.RectSelection != null);
-        if (_session is { IsPdf: false }) Add("Adjust Size…", "", () => _ = AdjustSizeAsync());
+        if (_session is { IsPdf: false })
+        {
+            Add("Adjust Size…", "", () => _ = AdjustSizeAsync());
+            Add("Remove Background", "", () => _ = RemoveBackgroundAsync(null));
+        }
         m.Add(new MenuFlyoutSeparator());
         Add("Actual Size", "", DocView.ZoomToActualSize, "Ctrl+0", has);
         Add("Zoom to Fit", "", () => DocView.SetFit(FitMode.Page), "Ctrl+9", has);
@@ -241,6 +245,39 @@ public sealed partial class MainWindow
         DocView.CommitInlineEditor();
         DocView.KillFormFocus();
         if (!_session.CanSaveInPlace) return await SaveAsAsync();
+
+        // Like Preview: offer PNG when transparency would be lost (e.g. after removing a JPEG's background).
+        if (!_session.IsPdf && ImageCodec.FormatForExtension(Path.GetExtension(_session.FilePath!)) is { } fmt
+            && !ImageCodec.SupportsAlpha(fmt) && _session.HasTransparency)
+        {
+            var dlg = new ContentDialog
+            {
+                XamlRoot = Root.XamlRoot,
+                Title = "Save as PNG?",
+                Content = $"This image now has transparent areas, which {fmt.Name} can't store; they would turn white. Save a PNG copy instead?",
+                PrimaryButtonText = "Save as PNG", SecondaryButtonText = $"Save as {fmt.Name}", CloseButtonText = "Cancel",
+                DefaultButton = ContentDialogButton.Primary,
+            };
+            var choice = await dlg.ShowAsync();
+            if (choice == ContentDialogResult.None) return false;
+            if (choice == ContentDialogResult.Primary)
+            {
+                string png = Path.ChangeExtension(_session.FilePath!, ".png");
+                if (File.Exists(png) && !await ConfirmReplaceAsync(png)) return await SaveAsAsync();
+                try
+                {
+                    await _session.SaveAsAsync(png);
+                    UpdateChrome();
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    ShowError("Couldn't save", ex.Message);
+                    return false;
+                }
+            }
+        }
+
         try
         {
             await _session.SaveAsync();
@@ -253,6 +290,14 @@ public sealed partial class MainWindow
             return false;
         }
     }
+
+    private async Task<bool> ConfirmReplaceAsync(string path) =>
+        await new ContentDialog
+        {
+            XamlRoot = Root.XamlRoot, Title = $"“{Path.GetFileName(path)}” already exists",
+            Content = "Do you want to replace it?", PrimaryButtonText = "Replace", CloseButtonText = "Choose Another Name",
+            DefaultButton = ContentDialogButton.Close,
+        }.ShowAsync() == ContentDialogResult.Primary;
 
     private async Task<bool> SaveAsAsync()
     {

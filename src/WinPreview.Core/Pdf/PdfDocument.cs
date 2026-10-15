@@ -271,27 +271,33 @@ public sealed unsafe class PdfDocument : IDisposable
     public IEnumerable<PdfSearchHit> Search(string query, bool matchCase = false, bool wholeWord = false, CancellationToken ct = default)
     {
         if (string.IsNullOrEmpty(query)) yield break;
-        uint flags = (matchCase ? FPDF_MATCHCASE : 0) | (wholeWord ? FPDF_MATCHWHOLEWORD : 0);
         int pages = PageCount;
         for (int p = 0; p < pages; p++)
         {
             ct.ThrowIfCancellationRequested();
-            var hits = new List<PdfSearchHit>();
-            lock (Pdfium.Lock)
-            {
-                var handle = FPDFText_FindStart(GetTextPage(p), query, flags, 0);
-                try
-                {
-                    while (FPDFText_FindNext(handle) != 0)
-                    {
-                        int start = FPDFText_GetSchResultIndex(handle), count = FPDFText_GetSchCount(handle);
-                        hits.Add(new PdfSearchHit(p, start, count, GetTextRects(p, start, count)));
-                    }
-                }
-                finally { FPDFText_FindClose(handle); }
-            }
-            foreach (var h in hits) yield return h;
+            foreach (var h in SearchPage(p, query, matchCase, wholeWord)) yield return h;
         }
+    }
+
+    public List<PdfSearchHit> SearchPage(int page, string query, bool matchCase = false, bool wholeWord = false)
+    {
+        var hits = new List<PdfSearchHit>();
+        if (string.IsNullOrEmpty(query)) return hits;
+        uint flags = (matchCase ? FPDF_MATCHCASE : 0) | (wholeWord ? FPDF_MATCHWHOLEWORD : 0);
+        lock (Pdfium.Lock)
+        {
+            var handle = FPDFText_FindStart(GetTextPage(page), query, flags, 0);
+            try
+            {
+                while (FPDFText_FindNext(handle) != 0)
+                {
+                    int start = FPDFText_GetSchResultIndex(handle), count = FPDFText_GetSchCount(handle);
+                    hits.Add(new PdfSearchHit(page, start, count, GetTextRects(page, start, count)));
+                }
+            }
+            finally { FPDFText_FindClose(handle); }
+        }
+        return hits;
     }
 
     // ---------------- Outline & metadata ----------------

@@ -1,6 +1,7 @@
 using WinPreview.Core;
 using WinPreview.Core.Markup;
 using WinPreview.Core.Pdf;
+using WinPreview.Core.Text;
 
 namespace WinPreview.Session;
 
@@ -130,6 +131,55 @@ public sealed class DocumentSession : IDisposable
         _geometry.Clear();
         _geometry.AddRange(Enumerable.Repeat<PageGeometry?>(null, Pages.Count));
         _premultiplied.Clear();
+        _textLayers.Clear();
+        _ocrTasks.Clear();
+        _contentGeneration++;
+    }
+
+    // ---------------- Text (PDF text or OCR'd image text) ----------------
+
+    private readonly Dictionary<int, TextLayer?> _textLayers = [];
+    private readonly Dictionary<int, Task<TextLayer?>> _ocrTasks = [];
+    private int _contentGeneration;
+
+    /// <summary>Raised when OCR finishes for an image page, making its text selectable.</summary>
+    public event Action<int>? TextLayerReady;
+
+    /// <summary>The page's text, or null while OCR is still running (or when there is none).</summary>
+    public TextLayer? GetTextLayer(int page)
+    {
+        if (page < 0 || page >= Pages.Count) return null;
+        if (_textLayers.TryGetValue(page, out var layer)) return layer;
+        if (Pdf != null) return _textLayers[page] = new PdfTextLayer(Pdf, page);
+        _ = GetTextLayerAsync(page);
+        return null;
+    }
+
+    public Task<TextLayer?> GetTextLayerAsync(int page)
+    {
+        if (_textLayers.TryGetValue(page, out var layer)) return Task.FromResult(layer);
+        if (Pdf != null) return Task.FromResult(GetTextLayer(page));
+        if (_ocrTasks.TryGetValue(page, out var running)) return running;
+        int gen = _contentGeneration;
+        var frame = Pages[page].Frame!.Clone();
+        var task = RunOcrAsync(page, frame, gen);
+        _ocrTasks[page] = task;
+        return task;
+    }
+
+    private async Task<TextLayer?> RunOcrAsync(int page, ImageFrame frame, int gen)
+    {
+        TextLayer? layer;
+        try { layer = await Services.OcrService.RecognizeAsync(frame); }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"OCR failed: {ex.Message}");
+            layer = null;
+        }
+        if (gen != _contentGeneration) return null; // pixels changed while recognizing
+        _textLayers[page] = layer;
+        TextLayerReady?.Invoke(page);
+        return layer;
     }
 
     public PageGeometry GetGeometry(int index)
@@ -156,7 +206,9 @@ public sealed class DocumentSession : IDisposable
 
         var f = Pages[index].Frame!;
         if (!_premultiplied.TryGetValue(index, out var px))
-            _premultiplied[index] = px = ImageCodec.Premultiply(f.Pixels);
+            _premultiplied[index] = px = Core.Imaging.AlphaTools.HasTransparency(f.Pixels)
+                ? ImageCodec.OnCheckerboard(f.Pixels, f.Width, f.Height)
+                : ImageCodec.Premultiply(f.Pixels);
         return Task.FromResult((px, f.Width, f.Height));
     }
 
@@ -407,6 +459,28 @@ public sealed class DocumentSession : IDisposable
             (f.Width, f.Height, f.DpiX, f.DpiY) = (width, height, dpi, dpi);
         });
     }
+
+    /// <summary>Instant Alpha: clears the region connected to a pixel whose colors are within tolerance.</summary>
+    public void InstantAlpha(int page, int x, int y, double tolerance)
+    {
+        var f = Pages[page].Frame;
+        if (f == null) return;
+        Structural("Instant Alpha", () =>
+        {
+            var sel = Core.Imaging.AlphaTools.FloodSelect(f.Pixels, f.Width, f.Height, x, y, tolerance);
+            Core.Imaging.AlphaTools.ClearSelected(f.Pixels, f.Width, f.Height, sel);
+        });
+    }
+
+    /// <summary>Multiplies a page's alpha by a foreground mask (Remove Background).</summary>
+    public void ApplyAlphaMask(int page, float[] mask, int maskSize)
+    {
+        var f = Pages[page].Frame;
+        if (f == null) return;
+        Structural("Remove Background", () => Core.Imaging.AlphaTools.ApplyMask(f.Pixels, f.Width, f.Height, mask, maskSize, maskSize));
+    }
+
+    public bool HasTransparency => Pages.Any(p => p.Frame != null && Core.Imaging.AlphaTools.HasTransparency(p.Frame.Pixels));
 
     // ---------------- Saving & exporting ----------------
 

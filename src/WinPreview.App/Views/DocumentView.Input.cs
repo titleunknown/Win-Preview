@@ -16,7 +16,7 @@ namespace WinPreview.Views;
 
 public sealed partial class DocumentView
 {
-    private enum DragKind { None, TextSelect, Move, Resize, Ink, Shape, RectSelect, Form }
+    private enum DragKind { None, TextSelect, Move, Resize, Ink, Shape, RectSelect, Form, Alpha }
 
     private DragKind _drag;
     private int _dragPage, _dragHandle, _textAnchor = -1, _formPage = -1;
@@ -112,13 +112,21 @@ public sealed partial class DocumentView
                 }
                 KillFormFocus();
                 FocusSurface();
-                if (pdf != null) BeginTextSelect(pv, e, user);
-                else { ClearRectSelection(); BeginDrag(pv, e, DragKind.RectSelect); }
+                // On images, pressing on recognized text selects text (Live Text); elsewhere it draws a selection rectangle.
+                if (pdf != null || _session.GetTextLayer(page)?.GetCharIndexAt(user, map.UserLength(2)) >= 0)
+                    BeginTextSelect(pv, e, user);
+                else { ClearTextSelection(); ClearRectSelection(); BeginDrag(pv, e, DragKind.RectSelect); }
                 return;
             }
             case Tool.Highlight:
                 FocusSurface();
                 if (pdf != null) BeginTextSelect(pv, e, user);
+                return;
+            case Tool.InstantAlpha when !_session.IsPdf:
+                FocusSurface();
+                ClearMarkupSelection();
+                BeginInstantAlpha(pv, dip);
+                BeginDrag(pv, e, DragKind.Alpha);
                 return;
             case Tool.RectSelect:
                 FocusSurface();
@@ -172,7 +180,7 @@ public sealed partial class DocumentView
     private void BeginTextSelect(PageView pv, PointerRoutedEventArgs e, PointD user)
     {
         ClearTextSelection();
-        _textAnchor = _session!.Pdf!.GetCharIndexAt(pv.Index, user, pv.Mapping.UserLength(3));
+        _textAnchor = _session!.GetTextLayer(pv.Index)?.GetCharIndexAt(user, pv.Mapping.UserLength(3)) ?? -1;
         BeginDrag(pv, e, DragKind.TextSelect);
     }
 
@@ -212,10 +220,10 @@ public sealed partial class DocumentView
 
         switch (_drag)
         {
-            case DragKind.TextSelect when pdf != null:
+            case DragKind.TextSelect when _session.GetTextLayer(_dragPage) is { } layer:
             {
-                int focus = pdf.GetNearestCharIndex(_dragPage, user);
-                if (_textAnchor < 0) _textAnchor = pdf.GetNearestCharIndex(_dragPage, map.ToUser(_dragStartDip));
+                int focus = layer.GetNearestCharIndex(user);
+                if (_textAnchor < 0) _textAnchor = layer.GetNearestCharIndex(map.ToUser(_dragStartDip));
                 if (focus >= 0 && _textAnchor >= 0) SetTextSelection(new TextSelection(_dragPage, _textAnchor, focus));
                 break;
             }
@@ -244,6 +252,9 @@ public sealed partial class DocumentView
                 break;
             case DragKind.Form when pdf != null:
                 pdf.FormMouseMove(_dragPage, user, PdfModifiers());
+                break;
+            case DragKind.Alpha:
+                DragInstantAlpha(raw);
                 break;
         }
     }
@@ -297,6 +308,9 @@ public sealed partial class DocumentView
                 break;
             case DragKind.Form when _session.Pdf is { } pdf:
                 pdf.FormMouseUp(_dragPage, map.ToUser(dip), PdfModifiers());
+                break;
+            case DragKind.Alpha:
+                EndInstantAlpha(apply: releaseDip.HasValue);
                 break;
         }
         _liveStroke = null;
@@ -404,11 +418,12 @@ public sealed partial class DocumentView
                     shape = ft == 6 ? InputSystemCursorShape.IBeam : InputSystemCursorShape.Hand; // 6 = text field
                     pdf.FormMouseMove(pv.Index, user, 0);
                 }
-                else if (pdf != null && pdf.GetCharIndexAt(pv.Index, user, pv.Mapping.UserLength(2)) >= 0) shape = InputSystemCursorShape.IBeam;
+                else if (_session.GetTextLayer(pv.Index)?.GetCharIndexAt(user, pv.Mapping.UserLength(2)) >= 0) shape = InputSystemCursorShape.IBeam;
                 else if (pdf == null) shape = InputSystemCursorShape.Cross;
                 break;
             }
             case Tool.Text: shape = InputSystemCursorShape.IBeam; break;
+            case Tool.InstantAlpha: shape = InputSystemCursorShape.Cross; break;
             default: shape = InputSystemCursorShape.Cross; break;
         }
         pv.SetCursor(shape);
@@ -431,7 +446,7 @@ public sealed partial class DocumentView
             OpenNoteEditor(pv.Index, note);
             e.Handled = true;
         }
-        else if (hit == null && _session.Pdf is { } pdf && pdf.FormFieldTypeAt(pv.Index, user) < 0)
+        else if (hit == null && (_session.Pdf?.FormFieldTypeAt(pv.Index, user) ?? -1) < 0)
         {
             SelectWordAt(pv.Index, user, pv.Mapping.UserLength(3));
             e.Handled = true;
@@ -440,15 +455,9 @@ public sealed partial class DocumentView
 
     private void SelectWordAt(int page, PointD user, double tol)
     {
-        var pdf = _session!.Pdf!;
-        int i = pdf.GetCharIndexAt(page, user, tol);
-        if (i < 0) return;
-        string text = pdf.GetPageText(page);
-        if (i >= text.Length || !char.IsLetterOrDigit(text[i])) return;
-        int s = i, t = i;
-        while (s > 0 && char.IsLetterOrDigit(text[s - 1])) s--;
-        while (t < text.Length - 1 && char.IsLetterOrDigit(text[t + 1])) t++;
-        SetTextSelection(new TextSelection(page, s, t));
+        if (_session?.GetTextLayer(page) is not { } layer) return;
+        if (layer.WordAt(layer.GetCharIndexAt(user, tol)) is { } word)
+            SetTextSelection(new TextSelection(page, word.Start, word.End));
     }
 
     private void OnPageRightTapped(object sender, RightTappedRoutedEventArgs e)
@@ -474,9 +483,12 @@ public sealed partial class DocumentView
         else if (_textSel != null)
         {
             menu.Items.Add(Item("Copy", "", CopySelection));
-            menu.Items.Add(Item("Highlight Text", "", () => MarkUpSelectedText(TextMarkupStyle.Highlight)));
-            menu.Items.Add(Item("Underline Text", "", () => MarkUpSelectedText(TextMarkupStyle.Underline)));
-            menu.Items.Add(Item("Strikethrough Text", "", () => MarkUpSelectedText(TextMarkupStyle.Strikeout)));
+            if (_session.IsPdf)
+            {
+                menu.Items.Add(Item("Highlight Text", "", () => MarkUpSelectedText(TextMarkupStyle.Highlight)));
+                menu.Items.Add(Item("Underline Text", "", () => MarkUpSelectedText(TextMarkupStyle.Underline)));
+                menu.Items.Add(Item("Strikethrough Text", "", () => MarkUpSelectedText(TextMarkupStyle.Strikeout)));
+            }
             menu.Items.Add(new MenuFlyoutSeparator());
         }
         ContextMenuOpening?.Invoke(menu, pv.Index);

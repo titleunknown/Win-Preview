@@ -103,6 +103,7 @@ public sealed partial class MainWindow : Window
         RebuildSidebar();
         UpdateChrome();
         DocView.FocusSurface();
+        WarmUpLiveText(0);
     }
 
     private void OnStructureChanged() => DispatcherQueue.TryEnqueue(() =>
@@ -150,7 +151,8 @@ public sealed partial class MainWindow : Window
         string name = _session?.DisplayName ?? "Win-Preview";
         TitleText.Text = _session?.IsDirty == true ? $"{name} — Edited" : name;
         Title = _session != null ? $"{name} - Win-Preview" : "Win-Preview";
-        SearchBox.IsEnabled = _session?.IsPdf == true;
+        SearchBox.IsEnabled = _session != null;
+        SearchBox.PlaceholderText = _session is { IsPdf: false } ? "Search text in image" : "Search";
         HighlightButton.IsEnabled = _session?.IsPdf == true;
         UpdateSubtitle();
         UpdateToolAvailability();
@@ -174,6 +176,13 @@ public sealed partial class MainWindow : Window
     {
         UpdateSubtitle();
         SelectThumb(page);
+        WarmUpLiveText(page);
+    }
+
+    /// <summary>Starts OCR on an image page in the background so its text is selectable when the pointer gets there.</summary>
+    private void WarmUpLiveText(int page)
+    {
+        if (_session is { IsPdf: false } s && page < s.PageCount) _ = s.GetTextLayerAsync(page);
     }
 
     public void ShowError(string title, string message) => ShowInfo(title, message, InfoBarSeverity.Error);

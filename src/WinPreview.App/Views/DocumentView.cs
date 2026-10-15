@@ -11,7 +11,7 @@ using WinPreview.Session;
 
 namespace WinPreview.Views;
 
-public enum Tool { Select, RectSelect, Draw, Rectangle, Oval, Line, Arrow, Text, Note, Highlight }
+public enum Tool { Select, RectSelect, Draw, Rectangle, Oval, Line, Arrow, Text, Note, Highlight, InstantAlpha }
 
 public enum FitMode { None, Width, Page }
 

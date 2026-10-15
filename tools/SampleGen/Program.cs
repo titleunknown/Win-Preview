@@ -57,6 +57,38 @@ using (var g = Graphics.FromImage(bmp))
     g.DrawString("Sample photo", new Font("Segoe UI", 48, FontStyle.Bold), Brushes.White, 60, 60);
 }
 bmp.Save(Path.Combine(outDir, "photo.png"), System.Drawing.Imaging.ImageFormat.Png);
+// A "photo of a document" for Live Text.
+using (var note = new Bitmap(1400, 700))
+using (var g = Graphics.FromImage(note))
+{
+    g.Clear(Color.FromArgb(250, 248, 240));
+    g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
+    using var title = new Font("Segoe UI", 40, FontStyle.Bold);
+    using var body = new Font("Segoe UI", 26);
+    g.DrawString("Grocery Receipt", title, Brushes.Black, 80, 60);
+    string[] rows = ["Apples 3.49", "Fresh bread 4.25", "Oat milk 2.99", "Total 10.73", "Thank you for shopping!"];
+    for (int i = 0; i < rows.Length; i++) g.DrawString(rows[i], body, Brushes.DimGray, 80, 190 + i * 85);
+    note.Save(Path.Combine(outDir, "receipt.png"), System.Drawing.Imaging.ImageFormat.Png);
+}
+
+// A single subject on a plain backdrop, saved as JPEG, for Remove Background / Instant Alpha.
+using (var obj = new Bitmap(1200, 900))
+using (var g = Graphics.FromImage(obj))
+{
+    g.SmoothingMode = SmoothingMode.AntiAlias;
+    using var bg = new LinearGradientBrush(new Rectangle(0, 0, 1200, 900), Color.FromArgb(205, 215, 225), Color.FromArgb(160, 175, 190), 90f);
+    g.FillRectangle(bg, 0, 0, 1200, 900);
+    g.FillEllipse(new SolidBrush(Color.FromArgb(70, 0, 0, 0)), 380, 700, 460, 70);           // shadow
+    g.FillRectangle(new SolidBrush(Color.FromArgb(230, 110, 40)), 420, 260, 340, 460);        // mug body
+    g.FillEllipse(new SolidBrush(Color.FromArgb(200, 90, 30)), 420, 690, 340, 60);
+    g.FillEllipse(new SolidBrush(Color.FromArgb(120, 50, 20)), 420, 230, 340, 60);            // rim
+    using var handle = new Pen(Color.FromArgb(230, 110, 40), 42);
+    g.DrawArc(handle, 700, 340, 200, 230, -90, 180);
+    var codec = System.Drawing.Imaging.ImageCodecInfo.GetImageEncoders().First(c => c.FormatID == System.Drawing.Imaging.ImageFormat.Jpeg.Guid);
+    using var ps = new System.Drawing.Imaging.EncoderParameters(1);
+    ps.Param[0] = new System.Drawing.Imaging.EncoderParameter(System.Drawing.Imaging.Encoder.Quality, 92L);
+    obj.Save(Path.Combine(outDir, "mug.jpg"), codec, ps);
+}
 Console.WriteLine($"Wrote samples to {Path.GetFullPath(outDir)}");
 
 static byte[] FormPdf()

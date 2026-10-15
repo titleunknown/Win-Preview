@@ -180,21 +180,21 @@ public sealed partial class DocumentView
     private void RedrawTextSelection()
     {
         foreach (var pv in _pages) pv.SelectionLayer.Children.Clear();
-        if (_textSel is not { } t || _session?.Pdf is not { } pdf || t.Page >= _pages.Count) return;
-        _pages[t.Page].ShowRects(_pages[t.Page].SelectionLayer, pdf.GetTextRects(t.Page, t.Start, t.Count), SelectionBrush);
+        if (_textSel is not { } t || t.Page >= _pages.Count || _session?.GetTextLayer(t.Page) is not { } layer) return;
+        _pages[t.Page].ShowRects(_pages[t.Page].SelectionLayer, layer.GetTextRects(t.Start, t.Count), SelectionBrush);
     }
 
     public string SelectedText =>
-        _textSel is { } t && _session?.Pdf is { } pdf ? pdf.GetText(t.Page, t.Start, t.Count) : "";
+        _textSel is { } t && _session?.GetTextLayer(t.Page) is { } layer ? layer.GetText(t.Start, t.Count) : "";
 
     public void SelectAllText()
     {
-        if (_session?.Pdf is not { } pdf || _pages.Count == 0) return;
-        int n = pdf.CountChars(_currentPage);
+        if (_pages.Count == 0 || _session?.GetTextLayer(_currentPage) is not { } layer) return;
+        int n = layer.CharCount;
         if (n > 0) SetTextSelection(new TextSelection(_currentPage, 0, n - 1));
     }
 
-    /// <summary>Turns the current text selection into a highlight/underline/strikeout markup.</summary>
+    /// <summary>Turns the current text selection into a highlight/underline/strikeout markup (PDFs only, as in Preview).</summary>
     public void MarkUpSelectedText(TextMarkupStyle style)
     {
         if (_textSel is not { } t || _session?.Pdf is not { } pdf) return;

@@ -38,21 +38,25 @@ public sealed partial class MainWindow
 
     private void ApplySidebarVisibility()
     {
-        bool show = _sidebarVisible && _session != null && (_session.PageCount > 1 || _session.IsPdf || ResultsTab.IsSelected);
+        bool show = _sidebarVisible && _session != null && (_session.PageCount > 1 || _session.IsPdf || ResultsPanel.Visibility == Visibility.Visible);
         Sidebar.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
         SidebarColumn.Width = new GridLength(show ? 210 : 0);
     }
 
     private void ShowSidebarTab(SelectorBarItem tab)
     {
+        // Show the panel first: a collapsed SelectorBar doesn't apply selection changes.
         _sidebarVisible = true;
-        SidebarSelector.SelectedItem = tab;
+        SyncSidebarPanels(tab);
         ApplySidebarVisibility();
+        SidebarSelector.SelectedItem = tab;
     }
 
-    private void SidebarSelector_SelectionChanged(SelectorBar sender, SelectorBarSelectionChangedEventArgs args)
+    private void SidebarSelector_SelectionChanged(SelectorBar sender, SelectorBarSelectionChangedEventArgs args) =>
+        SyncSidebarPanels(sender.SelectedItem);
+
+    private void SyncSidebarPanels(SelectorBarItem? sel)
     {
-        var sel = sender.SelectedItem;
         ThumbList.Visibility = sel == ThumbsTab ? Visibility.Visible : Visibility.Collapsed;
         TocTree.Visibility = sel == TocTab ? Visibility.Visible : Visibility.Collapsed;
         NotesList.Visibility = sel == NotesTab ? Visibility.Visible : Visibility.Collapsed;
@@ -67,7 +71,6 @@ public sealed partial class MainWindow
         bool pdf = _session?.IsPdf == true;
         TocTab.Visibility = pdf ? Visibility.Visible : Visibility.Collapsed;
         NotesTab.Visibility = pdf ? Visibility.Visible : Visibility.Collapsed;
-        ResultsTab.Visibility = pdf ? Visibility.Visible : Visibility.Collapsed;
         if (!pdf && !ThumbsTab.IsSelected) SidebarSelector.SelectedItem = ThumbsTab;
         ApplySidebarVisibility();
     }
@@ -319,26 +322,39 @@ public sealed partial class MainWindow
 
     private async Task RunSearchAsync(string query)
     {
-        if (_session?.Pdf is not { } pdf) return;
+        if (_session is not { } session) return;
         _searchCts?.Cancel();
         var cts = _searchCts = new CancellationTokenSource();
         _lastQuery = query;
         _results.Clear();
         ResultsList.ItemsSource = _results;
-        ResultsHeader.Text = "Searching…";
+        ResultsHeader.Text = session.IsPdf ? "Searching…" : "Reading text in images…";
         ShowSidebarTab(ResultsTab);
         _hits = [];
         try
         {
             var found = new List<(PdfSearchHit Hit, string Context)>();
-            await Task.Run(() =>
+            if (session.Pdf is { } pdf)
             {
-                foreach (var hit in pdf.Search(query, ct: cts.Token))
+                await Task.Run(() =>
                 {
-                    string ctx = Snippet(pdf, hit);
-                    lock (found) found.Add((hit, ctx));
+                    foreach (var hit in pdf.Search(query, ct: cts.Token))
+                        found.Add((hit, Snippet(new Core.Text.PdfTextLayer(pdf, hit.PageIndex), hit)));
+                }, cts.Token);
+            }
+            else
+            {
+                // Images: search the OCR text (recognized on demand).
+                for (int p = 0; p < session.PageCount && !cts.IsCancellationRequested; p++)
+                {
+                    if (await session.GetTextLayerAsync(p) is not { } layer) continue;
+                    foreach (var (start, count) in layer.Find(query, matchCase: false))
+                    {
+                        var hit = new PdfSearchHit(p, start, count, layer.GetTextRects(start, count));
+                        found.Add((hit, Snippet(layer, hit)));
+                    }
                 }
-            }, cts.Token);
+            }
             if (cts.IsCancellationRequested) return;
             _hits = found.Select(f => f.Hit).ToList();
             for (int i = 0; i < found.Count; i++)
@@ -356,11 +372,11 @@ public sealed partial class MainWindow
         catch (OperationCanceledException) { }
     }
 
-    private static string Snippet(PdfDocument pdf, PdfSearchHit hit)
+    private static string Snippet(Core.Text.TextLayer layer, PdfSearchHit hit)
     {
-        int n = pdf.CountChars(hit.PageIndex);
+        int n = layer.CharCount;
         int start = Math.Max(0, hit.CharStart - 40), end = Math.Min(n, hit.CharStart + hit.CharCount + 60);
-        string s = pdf.GetText(hit.PageIndex, start, end - start).Replace("\r", " ").Replace("\n", " ");
+        string s = layer.GetText(start, end - start).Replace("\r", " ").Replace("\n", " ");
         return (start > 0 ? "…" : "") + s.Trim() + (end < n ? "…" : "");
     }
 

@@ -28,6 +28,8 @@ public sealed partial class MainWindow
     private readonly Dictionary<Tool, ToggleButton> _toolButtons = [];
     private DropDownButton? _shapeButton, _signButton, _widthButton, _strokeButton, _fillButton, _textButton;
     private Button? _cropButton, _sizeButton;
+    private ToggleButton? _alphaButton;
+    private SplitButton? _removeBgButton;
     private Rectangle? _strokeSwatch, _fillSwatch;
     private TextBlock? _textSwatch;
     private Tool _lastShapeTool = Tool.Rectangle;
@@ -94,6 +96,25 @@ public sealed partial class MainWindow
         _sizeButton.Click += async (_, _) => await AdjustSizeAsync();
         bar.Add(_sizeButton);
 
+        _alphaButton = ToolButton(Tool.InstantAlpha, new TextBlock
+        {
+            Text = "α", FontSize = 18, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, -4, 0, 0),
+        }, "Instant Alpha — press on a color and drag to remove similar connected colors");
+        bar.Add(_alphaButton);
+
+        _removeBgButton = new SplitButton
+        {
+            Content = Glyph(""), Padding = new Thickness(8, 4, 6, 4),
+            Background = new SolidColorBrush(Colors.Transparent), BorderBrush = new SolidColorBrush(Colors.Transparent),
+        };
+        ToolTipService.SetToolTip(_removeBgButton, "Remove Background");
+        _removeBgButton.Click += (_, _) => _ = RemoveBackgroundAsync(null);
+        var bgMenu = new MenuFlyout { Placement = FlyoutPlacementMode.Bottom };
+        bgMenu.Opening += (_, _) => BuildRemoveBackgroundMenu(bgMenu);
+        _removeBgButton.Flyout = bgMenu;
+        bar.Add(_removeBgButton);
+
         bar.Add(Separator());
 
         _widthButton = StyleDropDown(Symbol("≡", 18), "Shape style — line width");
@@ -150,7 +171,10 @@ public sealed partial class MainWindow
     {
         bool pdf = _session?.IsPdf == true;
         if (_toolButtons.TryGetValue(Tool.Note, out var note)) note.Visibility = pdf ? Visibility.Visible : Visibility.Collapsed;
-        if (_sizeButton != null) _sizeButton.Visibility = _session is { IsPdf: false } ? Visibility.Visible : Visibility.Collapsed;
+        var imageOnly = _session is { IsPdf: false } ? Visibility.Visible : Visibility.Collapsed;
+        if (_sizeButton != null) _sizeButton.Visibility = imageOnly;
+        if (_alphaButton != null) _alphaButton.Visibility = imageOnly;
+        if (_removeBgButton != null) _removeBgButton.Visibility = imageOnly;
         if (_cropButton != null) _cropButton.IsEnabled = DocView.RectSelection != null;
         if (_toolButtons.TryGetValue(Tool.Select, out var sel))
             ToolTipService.SetToolTip(sel, pdf ? "Text selection — select text, markups, and form fields" : "Selection — select markups or an area");

@@ -46,6 +46,21 @@ Copyright © Benoît Blanchon. Licensed under the Apache License 2.0
 © Microsoft Corporation. Redistributed under the Microsoft Software License Terms for the
 Windows App SDK (included in the `Microsoft.WindowsAppSDK` NuGet package).
 
+## ONNX Runtime
+
+<https://github.com/microsoft/onnxruntime>: runs the background-removal models.
+© Microsoft Corporation. MIT License.
+
+## Background-removal models
+
+- **U²-Net-p** (`src/WinPreview.App/Models/u2netp.onnx`, bundled): from U²-Net by Xuebin Qin et al.,
+  <https://github.com/xuebinqin/U-2-Net>. Apache License 2.0.
+- **ISNet (DIS), general use** (optional download, not in this repository): from "Highly Accurate Dichotomous
+  Image Segmentation" by Xuebin Qin et al., <https://github.com/xuebinqin/DIS>. Apache License 2.0.
+
+Both ONNX conversions are distributed by the rembg project (<https://github.com/danielgatis/rembg>, MIT License),
+where the app downloads the optional model from. Its SHA-256 is pinned in `BackgroundRemover.cs`.
+
 ## .NET
 
 <https://github.com/dotnet/runtime>: © .NET Foundation and Contributors. MIT License.

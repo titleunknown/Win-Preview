@@ -173,7 +173,7 @@ public static class ImageCodec
         await ras.AsStreamForRead().CopyToAsync(output);
     }
 
-    private static byte[] FlattenOnWhite(byte[] px)
+    public static byte[] FlattenOnWhite(byte[] px)
     {
         var o = (byte[])px.Clone();
         for (int i = 0; i < o.Length; i += 4)
@@ -185,6 +185,28 @@ public static class ImageCodec
         }
         return o;
     }
+
+    /// <summary>Composites straight-alpha pixels over a light checkerboard so transparency is visible on screen.</summary>
+    public static byte[] OnCheckerboard(byte[] px, int width, int height)
+    {
+        var o = new byte[px.Length];
+        for (int y = 0; y < height; y++)
+            for (int x = 0; x < width; x++)
+            {
+                int i = (y * width + x) * 4, a = px[i + 3];
+                int bg = ((x >> 3) + (y >> 3)) % 2 == 0 ? 255 : 214;
+                o[i] = (byte)((px[i] * a + bg * (255 - a)) / 255);
+                o[i + 1] = (byte)((px[i + 1] * a + bg * (255 - a)) / 255);
+                o[i + 2] = (byte)((px[i + 2] * a + bg * (255 - a)) / 255);
+                o[i + 3] = 255;
+            }
+        return o;
+    }
+
+    /// <summary>Formats that can store an alpha channel.</summary>
+    public static bool SupportsAlpha(ImageFormat f) =>
+        f.EncoderId == BitmapEncoder.PngEncoderId || f.EncoderId == BitmapEncoder.TiffEncoderId
+        || f.EncoderId == BitmapEncoder.GifEncoderId;
 
     /// <summary>Straight → premultiplied alpha, which XAML bitmaps expect.</summary>
     public static byte[] Premultiply(byte[] px)
