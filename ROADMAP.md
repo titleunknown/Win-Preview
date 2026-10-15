@@ -10,12 +10,12 @@ Planned work, roughly in priority order. [FEATURES.md](FEATURES.md) tracks parit
 - Text boxes have a transparent background while typing
 - Fix: password-protected PDFs given on the command line failed to open
 
-## In progress
+## Later
 
 ### Code signing
 Signing releases through SignPath Foundation to remove the SmartScreen warning. The build pipeline and
-configuration are in place; the application to SignPath and the first signed release are next.
-See [docs/CODE_SIGNING.md](docs/CODE_SIGNING.md).
+configuration are in place; the application to SignPath will happen once the app has an active user base
+(SignPath requires an actively maintained, released project). See [docs/CODE_SIGNING.md](docs/CODE_SIGNING.md).
 
 ## To do
 
