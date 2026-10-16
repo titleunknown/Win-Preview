@@ -53,6 +53,10 @@
                 <Button Style="{StaticResource ToolButtonStyle}" Click="ZoomIn_Click" ToolTipService.ToolTip="Zoom in (Ctrl+=)">
                     <FontIcon Glyph="&#xE8A3;" FontSize="16" />
                 </Button>
+                <ToggleButton x:Name="ZoomToolToggle" Style="{StaticResource ToolToggleStyle}" Click="ZoomTool_Click"
+                              ToolTipService.ToolTip="Zoom tool (Z): double-click to switch between actual size and fit; drag to pan when zoomed in">
+                    <FontIcon Glyph="&#xE71E;" FontSize="16" />
+                </ToggleButton>
                 <Button Style="{StaticResource ToolButtonStyle}" Click="Share_Click" ToolTipService.ToolTip="Share">
                     <FontIcon Glyph="&#xE72D;" FontSize="16" />
                 </Button>

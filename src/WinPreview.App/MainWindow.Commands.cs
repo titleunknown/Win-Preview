@@ -121,6 +121,14 @@ public sealed partial class MainWindow
     private void Open_Click(object sender, RoutedEventArgs e) => _ = OpenAsync();
     private void Inspector_Click(object sender, RoutedEventArgs e) => _ = ShowInspectorAsync();
     private void ZoomIn_Click(object sender, RoutedEventArgs e) => DocView.ZoomIn();
+    private void ZoomTool_Click(object sender, RoutedEventArgs e) => ToggleZoomTool();
+
+    /// <summary>Z: switches to the zoom tool, or back to the normal selection tool.</summary>
+    private void ToggleZoomTool()
+    {
+        DocView.Tool = DocView.Tool == Tool.Zoom ? Tool.Select : Tool.Zoom;
+        SyncToolButtons();
+    }
     private void ZoomOut_Click(object sender, RoutedEventArgs e) => DocView.ZoomOut();
     private void RotateLeft_Click(object sender, RoutedEventArgs e) => RotateCurrent(clockwise: false);
     private void Share_Click(object sender, RoutedEventArgs e) => _ = ShareAsync();
@@ -218,6 +226,11 @@ public sealed partial class MainWindow
             case VirtualKey.L when ctrl: RotateCurrent(false); break;
             case VirtualKey.R when ctrl: RotateCurrent(true); break;
             case VirtualKey.K when ctrl: CropOrStartSelection(); break;
+            // Z toggles the zoom tool (not while typing, and Ctrl+Z is still undo).
+            case VirtualKey.Z when !ctrl && !alt && !shift && _session != null && !DocView.IsTypingIntoDocument
+                && e.OriginalSource is not (TextBox or PasswordBox or NumberBox or AutoSuggestBox or Microsoft.UI.Xaml.Controls.Primitives.ButtonBase):
+                ToggleZoomTool();
+                break;
             // C starts a crop selection, or crops if there already is one. Not while typing into a field, a text box
             // or a PDF form, and not on a focused button (where the letter does nothing anyway).
             case VirtualKey.C when !ctrl && !alt && !shift && _session != null && !DocView.IsTypingIntoDocument
@@ -540,6 +553,7 @@ public sealed partial class MainWindow
             Ctrl+= / Ctrl+−	Zoom in / out      Ctrl+0	Actual size
             Ctrl+9	Zoom to fit                Ctrl+L / Ctrl+R	Rotate left / right
             C	Crop (also Ctrl+K)          Ctrl+I	Document info
+            Z	Zoom tool: double-click toggles actual size / fit, drag pans when zoomed in
             Ctrl+Shift+A	Markup toolbar       Ctrl+Alt+S	Sidebar
             Ctrl+Alt+2/3/4	Thumbnails / Contents / Highlights & Notes
             Ctrl+W	Close tab (or window)   Ctrl+Tab	Next tab (Shift: previous)

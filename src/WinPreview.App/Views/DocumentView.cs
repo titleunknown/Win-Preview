@@ -11,7 +11,7 @@ using WinPreview.Session;
 
 namespace WinPreview.Views;
 
-public enum Tool { Select, RectSelect, Draw, Rectangle, Oval, Line, Arrow, Text, Note, Highlight, InstantAlpha }
+public enum Tool { Select, RectSelect, Draw, Rectangle, Oval, Line, Arrow, Text, Note, Highlight, InstantAlpha, Zoom }
 
 public enum FitMode { None, Width, Page }
 
@@ -67,6 +67,7 @@ public sealed partial class DocumentView : Grid
         _scroll.SizeChanged += (_, _) => OnViewportSizeChanged();
         _scroll.AddHandler(PointerWheelChangedEvent, new PointerEventHandler(OnPointerWheel), true);
         PreviewKeyDown += OnPreviewKeyDown;
+        ZoomChanged += RefreshHoverCursor;
         CharacterReceived += OnCharacterReceived;
     }
 
@@ -96,6 +97,7 @@ public sealed partial class DocumentView : Grid
             if (value != Tool.Select && value != Tool.Highlight) ClearTextSelection();
             if (value != Tool.RectSelect) ClearRectSelection();
             ToolChanged?.Invoke();
+            RefreshHoverCursor();
         }
     }
 

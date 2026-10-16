@@ -25,6 +25,9 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\WinPreview.Core\WinPreview.Core.csproj" />
+    <!-- Native cursor resources: not referenced as code, just copied next to the app (see Views/AppCursors.cs). -->
+    <ProjectReference Include="..\WinPreview.Resources\WinPreview.Resources.csproj" ReferenceOutputAssembly="false"
+                      OutputItemType="Content" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="Assets\AppIcon.ico" CopyToOutputDirectory="PreserveNewest" />

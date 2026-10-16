@@ -16,7 +16,7 @@ namespace WinPreview.Views;
 
 public sealed partial class DocumentView
 {
-    private enum DragKind { None, TextSelect, Move, Resize, Ink, Shape, RectSelect, Form, Alpha, CropMove, CropResize }
+    private enum DragKind { None, TextSelect, Move, Resize, Ink, Shape, RectSelect, Form, Alpha, CropMove, CropResize, Pan }
 
     private DragKind _drag;
     private int _dragPage, _dragHandle, _textAnchor = -1, _formPage = -1;
@@ -118,10 +118,18 @@ public sealed partial class DocumentView
                 else
                 {
                     ClearTextSelection();
-                    if (!TryBeginCropEdit(pv, e, dip)) { ClearRectSelection(); BeginDrag(pv, e, DragKind.RectSelect); }
+                    // Zoomed in past the window, dragging pans (as in most photo viewers); otherwise it selects an area.
+                    if (TryBeginCropEdit(pv, e, dip)) return;
+                    if (CanPan(pv)) { BeginPan(pv, e); return; }
+                    ClearRectSelection();
+                    BeginDrag(pv, e, DragKind.RectSelect);
                 }
                 return;
             }
+            case Tool.Zoom:
+                FocusSurface();
+                if (CanPan(pv)) BeginPan(pv, e);
+                return;
             case Tool.Highlight:
                 FocusSurface();
                 if (pdf != null) BeginTextSelect(pv, e, user);
@@ -264,6 +272,13 @@ public sealed partial class DocumentView
             case DragKind.Alpha:
                 DragInstantAlpha(raw);
                 break;
+            case DragKind.Pan:
+            {
+                // Measured against the scroll viewer (which doesn't move), not the page that is sliding underneath.
+                var p = e.GetCurrentPoint(_scroll).Position;
+                _scroll.ChangeView(_panStartOffset.X - (p.X - _panStartPoint.X), _panStartOffset.Y - (p.Y - _panStartPoint.Y), null, true);
+                break;
+            }
         }
     }
 
@@ -280,6 +295,7 @@ public sealed partial class DocumentView
     {
         var kind = _drag;
         _drag = DragKind.None;
+        RefreshHoverCursor(); // e.g. the closed hand shown while panning goes back to an open hand
         Log.Write($"end drag={kind} moved={_dragMoved} release={releaseDip}");
         if (_session == null || _dragPage >= _pages.Count) return;
         var pv = _pages[_dragPage];
@@ -411,7 +427,15 @@ public sealed partial class DocumentView
     private void UpdateHoverCursor(PageView pv, Point dip)
     {
         if (_session == null) return;
+        RememberHover(pv, dip);
         if (UpdateCropCursor(pv, dip)) return;
+        if (Tool == Tool.Zoom)
+        {
+            // A hand when there's more picture than window to drag around; otherwise a magnifier showing what a
+            // double-click will do (zoom in to actual size, or back out to fit).
+            pv.SetCursor(CanPan(pv) ? AppCursors.HandOpen : IsActualSize ? AppCursors.ZoomOut : AppCursors.ZoomIn);
+            return;
+        }
         var shape = InputSystemCursorShape.Arrow;
         switch (Tool)
         {
@@ -428,6 +452,7 @@ public sealed partial class DocumentView
                     pdf.FormMouseMove(pv.Index, user, 0);
                 }
                 else if (_session.GetTextLayer(pv.Index)?.GetCharIndexAt(user, pv.Mapping.UserLength(2)) >= 0) shape = InputSystemCursorShape.IBeam;
+                else if (pdf == null && CanPan(pv)) { pv.SetCursor(AppCursors.HandOpen); return; }
                 else if (pdf == null) shape = InputSystemCursorShape.Cross;
                 break;
             }
@@ -440,6 +465,12 @@ public sealed partial class DocumentView
 
     private void OnPageDoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
     {
+        if (_session != null && Tool == Tool.Zoom && !IsInsideEditor(e.OriginalSource))
+        {
+            ToggleActualSize(e.GetPosition(_scroll));
+            e.Handled = true;
+            return;
+        }
         if (_session == null || Tool != Tool.Select || IsInsideEditor(e.OriginalSource)) return;
         var pv = (PageView)sender;
         var dip = e.GetPosition(pv);

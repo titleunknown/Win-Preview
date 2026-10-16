@@ -58,6 +58,8 @@ public sealed partial class PageView : Grid
 
     public void SetCursor(InputSystemCursorShape shape) => ProtectedCursor = InputSystemCursor.Create(shape);
 
+    public void SetCursor(InputCursor cursor) => ProtectedCursor = cursor;
+
     public void SetGeometry(PageGeometry geometry, double zoom)
     {
         Geometry = geometry;

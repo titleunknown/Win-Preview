@@ -181,6 +181,7 @@ public sealed partial class MainWindow
     private void SyncToolButtons()
     {
         foreach (var (tool, b) in _toolButtons) b.IsChecked = DocView.Tool == tool;
+        ZoomToolToggle.IsChecked = DocView.Tool == Tool.Zoom;
         bool shapeActive = DocView.Tool is Tool.Rectangle or Tool.Oval or Tool.Line or Tool.Arrow;
         if (_shapeButton != null)
             _shapeButton.Background = shapeActive ? (Brush)Application.Current.Resources["ControlFillColorSecondaryBrush"] : new SolidColorBrush(Colors.Transparent);
