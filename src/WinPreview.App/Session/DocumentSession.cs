@@ -451,11 +451,36 @@ public sealed class DocumentSession : IDisposable
         });
     }
 
-    /// <summary>Crops a PDF page's visible area (CropBox) to a rectangle in user space.</summary>
-    public void CropPdfPage(int page, RectD userRect)
+    /// <summary>
+    /// Crops PDF pages to the area selected on <paramref name="sourcePage"/>. The selection is taken as the area of
+    /// the page as it appears (rotation included) and applied to each target page the same way, so cropping "all
+    /// pages" crops them all to the same visible margins even if some are rotated. Non-destructive: the content is
+    /// kept and <see cref="ResetCrop"/> brings it back.
+    /// </summary>
+    public void CropPdfPages(IReadOnlyList<int> pages, int sourcePage, RectD userRect)
     {
-        if (Pdf == null) return;
-        Structural("Crop", () => Pdf.SetCropBox(page, userRect));
+        if (Pdf == null || pages.Count == 0) return;
+        var shown = GetGeometry(sourcePage).UserToDisplay.Apply(userRect);
+        var targets = pages.Distinct().Select(p => (Page: p, Geometry: GetGeometry(p))).Select(t =>
+        {
+            var d = new RectD(Math.Max(0, shown.X1), Math.Max(0, shown.Y1), Math.Min(t.Geometry.Width, shown.X2), Math.Min(t.Geometry.Height, shown.Y2));
+            return (t.Page, Box: d.IsEmpty ? default : t.Geometry.DisplayToUser.Apply(d));
+        }).Where(t => !t.Box.IsEmpty).ToList();
+        if (targets.Count == 0) return;
+        Structural(targets.Count == 1 ? "Crop" : "Crop All Pages", () =>
+        {
+            foreach (var (page, box) in targets) Pdf.SetCropBox(page, box);
+        });
+    }
+
+    /// <summary>Restores the full page area on PDF pages that were cropped.</summary>
+    public void ResetCrop(IReadOnlyList<int> pages)
+    {
+        if (Pdf == null || pages.Count == 0) return;
+        Structural("Reset Crop", () =>
+        {
+            foreach (int p in pages.Distinct()) Pdf.ResetCropBox(p);
+        });
     }
 
     public async Task ResizeImageAsync(int page, int width, int height, double dpi)

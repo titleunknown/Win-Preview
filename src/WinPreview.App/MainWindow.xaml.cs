@@ -40,6 +40,8 @@ public sealed partial class MainWindow : Window
         DocView.ZoomChanged += UpdateSubtitle;
         DocView.SelectionChanged += OnDocSelectionChanged;
         DocView.ToolChanged += SyncToolButtons;
+        DocView.CropRequested += all => Crop(all);
+        Info.Closed += (_, _) => Info.Visibility = Visibility.Collapsed; // also when the user clicks its X
         DocView.ContextMenuOpening += OnDocContextMenu;
 
         BuildMarkupToolbar();
@@ -197,15 +199,26 @@ public sealed partial class MainWindow : Window
 
     public void ShowInfo(string title, string message, InfoBarSeverity severity = InfoBarSeverity.Informational)
     {
+        _infoTimer?.Stop(); // an older message's timer must not close this one early
         Info.Title = title;
         Info.Message = message;
         Info.Severity = severity;
+        Info.Visibility = Visibility.Visible;
         Info.IsOpen = true;
-        var timer = DispatcherQueue.CreateTimer();
+        var timer = _infoTimer = DispatcherQueue.CreateTimer();
         timer.Interval = TimeSpan.FromSeconds(severity == InfoBarSeverity.Error ? 8 : 4);
         timer.IsRepeating = false;
-        timer.Tick += (_, _) => Info.IsOpen = false;
+        timer.Tick += (_, _) => HideInfo();
         timer.Start();
+    }
+
+    private Microsoft.UI.Dispatching.DispatcherQueueTimer? _infoTimer;
+
+    /// <summary>Closes the message bar and collapses it, so no empty shell is left over the page.</summary>
+    private void HideInfo()
+    {
+        Info.IsOpen = false;
+        Info.Visibility = Visibility.Collapsed;
     }
 
     // ---------------- Closing ----------------

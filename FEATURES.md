@@ -39,7 +39,7 @@ Organized by the chapters of Apple's [Preview User Guide](https://support.apple.
 | Text boxes | ✅ | Grows as you type. Helvetica, Times or Courier, with size and color. |
 | Combine PDFs | ✅ | Insert from file, or drop files on the thumbnails. |
 | Add, delete, move and rotate pages | ✅ | Add Page and Remove buttons under the thumbnails (blank page or pages from a file), plus drag to reorder. All undoable. |
-| Crop PDF pages | ✅ | Rectangular selection, then Ctrl+K (sets the CropBox). |
+| Crop PDF pages | ✅ | Click the Crop button (or use the rectangular selection tool) and drag over the area to keep. Adjust with the handles or move it; the rest is dimmed, with a size readout. Crop one page or **All pages** from the floating button (Enter also works). Non-destructive: **Reset Crop** in the More menu restores the full page. Works on rotated pages. |
 | Quartz filter effects | ⬜ | |
 | Redaction | ⬜ | Planned; see [ROADMAP.md](ROADMAP.md). |
 
@@ -47,7 +47,7 @@ Organized by the chapters of Apple's [Preview User Guide](https://support.apple.
 
 | Preview feature | Status | Notes |
 |---|---|---|
-| Crop, rotate | ✅ | |
+| Crop, rotate | ✅ | Crop has a live preview, handles, a thirds grid and aspect-ratio presets (free, same as page, square, 4:3, 3:2, 16:9, 5:4). Markups move with the crop. |
 | Resize (Adjust Size) | ✅ | Proportional scaling, resolution, Fant resampling. |
 | Flip | ⬜ | |
 | Annotate images | ✅ | Same tools as PDFs; flattened on save. |

@@ -104,16 +104,7 @@ public sealed partial class DocumentView
                 if (pv.AdornerLayer.Children[i] is FrameworkElement { Tag: "adorner" })
                     pv.AdornerLayer.Children.RemoveAt(i);
 
-        if (_rectSel is { } rs && rs.Page < _pages.Count)
-        {
-            var pv = _pages[rs.Page];
-            var r = pv.Mapping.ToDip(rs.Rect);
-            AddAdorner(pv, new Rectangle
-            {
-                Width = r.Width, Height = r.Height, Stroke = AccentBrush, StrokeThickness = 1.5,
-                StrokeDashArray = [4, 3], Fill = new SolidColorBrush(Windows.UI.Color.FromArgb(30, 0, 120, 215)),
-            }, r.X, r.Y);
-        }
+        DrawCropAdorners();
 
         if (_selected is not { } sel || sel.Page >= _pages.Count || _session == null) return;
         var item = _session.FindMarkup(sel.Page, sel.Id);
@@ -133,10 +124,10 @@ public sealed partial class DocumentView
             }, hp.X - HandleSize / 2, hp.Y - HandleSize / 2);
     }
 
-    private static void AddAdorner(PageView pv, FrameworkElement e, double x, double y)
+    private static void AddAdorner(PageView pv, FrameworkElement e, double x, double y, bool hitTest = false)
     {
         e.Tag = "adorner";
-        e.IsHitTestVisible = false;
+        e.IsHitTestVisible = hitTest;
         Canvas.SetLeft(e, x);
         Canvas.SetTop(e, y);
         pv.AdornerLayer.Children.Add(e);

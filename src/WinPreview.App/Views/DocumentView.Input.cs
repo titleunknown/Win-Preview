@@ -16,7 +16,7 @@ namespace WinPreview.Views;
 
 public sealed partial class DocumentView
 {
-    private enum DragKind { None, TextSelect, Move, Resize, Ink, Shape, RectSelect, Form, Alpha }
+    private enum DragKind { None, TextSelect, Move, Resize, Ink, Shape, RectSelect, Form, Alpha, CropMove, CropResize }
 
     private DragKind _drag;
     private int _dragPage, _dragHandle, _textAnchor = -1, _formPage = -1;
@@ -64,7 +64,7 @@ public sealed partial class DocumentView
 
     private void OnPagePointerPressed(object sender, PointerRoutedEventArgs e)
     {
-        if (_session == null || IsInsideEditor(e.OriginalSource)) return;
+        if (_session == null || IsInsideEditor(e.OriginalSource) || IsInsideButton(e.OriginalSource)) return;
         var pv = (PageView)sender;
         var pt = e.GetCurrentPoint(pv);
         if (!pt.Properties.IsLeftButtonPressed) return;
@@ -115,7 +115,11 @@ public sealed partial class DocumentView
                 // On images, pressing on recognized text selects text (Live Text); elsewhere it draws a selection rectangle.
                 if (pdf != null || _session.GetTextLayer(page)?.GetCharIndexAt(user, map.UserLength(2)) >= 0)
                     BeginTextSelect(pv, e, user);
-                else { ClearTextSelection(); ClearRectSelection(); BeginDrag(pv, e, DragKind.RectSelect); }
+                else
+                {
+                    ClearTextSelection();
+                    if (!TryBeginCropEdit(pv, e, dip)) { ClearRectSelection(); BeginDrag(pv, e, DragKind.RectSelect); }
+                }
                 return;
             }
             case Tool.Highlight:
@@ -130,8 +134,7 @@ public sealed partial class DocumentView
                 return;
             case Tool.RectSelect:
                 FocusSurface();
-                ClearRectSelection();
-                BeginDrag(pv, e, DragKind.RectSelect);
+                if (!TryBeginCropEdit(pv, e, dip)) { ClearRectSelection(); BeginDrag(pv, e, DragKind.RectSelect); }
                 return;
             case Tool.Draw:
             {
@@ -247,8 +250,13 @@ public sealed partial class DocumentView
                 _livePreview!.IsHitTestVisible = false;
                 break;
             case DragKind.RectSelect:
-                _rectSel = (_dragPage, map.ToUser(new Rect(_dragStartDip, dip)));
-                RedrawAdorners();
+                SetCrop(pv, CropMath.NewSelection(new PointD(_dragStartDip.X, _dragStartDip.Y), new PointD(dip.X, dip.Y), PageBoundsDip(pv), CropRatioFor(pv)));
+                break;
+            case DragKind.CropMove:
+                SetCrop(pv, CropMath.Move(_cropStart, dip.X - _dragStartDip.X, dip.Y - _dragStartDip.Y, PageBoundsDip(pv)));
+                break;
+            case DragKind.CropResize:
+                SetCrop(pv, CropMath.Resize(_cropStart, _cropHandle, new PointD(dip.X, dip.Y), PageBoundsDip(pv), CropRatioFor(pv)));
                 break;
             case DragKind.Form when pdf != null:
                 pdf.FormMouseMove(_dragPage, user, PdfModifiers());
@@ -403,6 +411,7 @@ public sealed partial class DocumentView
     private void UpdateHoverCursor(PageView pv, Point dip)
     {
         if (_session == null) return;
+        if (UpdateCropCursor(pv, dip)) return;
         var shape = InputSystemCursorShape.Arrow;
         switch (Tool)
         {
@@ -629,6 +638,10 @@ public sealed partial class DocumentView
 
         switch (e.Key)
         {
+            case VirtualKey.Enter when _rectSel != null && !ctrl:
+                CropRequested?.Invoke(false);
+                e.Handled = true;
+                break;
             case VirtualKey.Delete or VirtualKey.Back when _selected != null:
                 DeleteSelection();
                 e.Handled = true;

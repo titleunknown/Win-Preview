@@ -45,7 +45,7 @@ public sealed partial class MainWindow
             if (_session is { IsPdf: false } s && page < s.PageCount)
             {
                 s.ApplyAlphaMask(page, mask, model.InputSize);
-                Info.IsOpen = false;
+                HideInfo();
             }
         }
         catch (Exception ex)

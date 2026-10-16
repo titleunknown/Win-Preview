@@ -369,6 +369,19 @@ public sealed unsafe class PdfDocument : IDisposable
         }
     }
 
+    /// <summary>Undoes a crop: the visible area becomes the page's full media box again.</summary>
+    /// <returns>False when the page has no media box to restore.</returns>
+    public bool ResetCropBox(int index)
+    {
+        lock (Pdfium.Lock)
+        {
+            float l, b, r, t;
+            if (FPDFPage_GetMediaBox(GetPage(index), &l, &b, &r, &t) == 0) return false;
+            SetCropBox(index, new RectD(l, b, r, t));
+            return true;
+        }
+    }
+
     public void DeletePage(int index)
     {
         lock (Pdfium.Lock)

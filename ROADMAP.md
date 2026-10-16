@@ -2,13 +2,11 @@
 
 Planned work, roughly in priority order. [FEATURES.md](FEATURES.md) tracks parity with macOS Preview.
 
-## Next release (v0.2), in the repository now
+## Next release (v0.3), in the repository now
 
-- Password protection for PDFs (AES-256), with an optional permissions password
-- Reduce File Size (lossless, balanced and smallest)
-- Add Page / Remove buttons in the sidebar
-- Text boxes have a transparent background while typing
-- Fix: password-protected PDFs given on the command line failed to open
+- Better crop: adjustable selection with handles, dimmed surroundings, thirds grid and size readout, a floating
+  Crop button, aspect-ratio presets, crop all PDF pages, and Reset Crop
+- Fix: a leftover empty message bar could stay on screen after a notice closed
 
 ## Later
 

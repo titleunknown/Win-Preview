@@ -63,7 +63,13 @@ public sealed partial class MainWindow
             foreach (var item in tmp.Items.ToList()) { tmp.Items.Remove(item); pages.Items.Add(item); }
             m.Add(pages);
         }
-        Add("Crop to Selection", "", Crop, "Ctrl+K", DocView.RectSelection != null);
+        Add("Crop to Selection", "", () => Crop(), "Ctrl+K", DocView.RectSelection != null);
+        if (pdf)
+        {
+            Add("Crop All Pages to Selection", "", () => Crop(allPages: true), null, DocView.RectSelection != null);
+            Add("Reset Crop", "", () => ResetCrop(allPages: false));
+            Add("Reset Crop on All Pages", "", () => ResetCrop(allPages: true));
+        }
         if (_session is { IsPdf: false })
         {
             Add("Adjust Size…", "", () => _ = AdjustSizeAsync());
@@ -146,12 +152,28 @@ public sealed partial class MainWindow
 
     private void Redo() => _session?.Undo.Redo();
 
-    private void Crop()
+    /// <param name="allPages">PDFs only: crop every page to the same visible area.</param>
+    private void Crop(bool allPages = false)
     {
         if (_session == null || DocView.RectSelection is not { } sel) return;
-        if (_session.IsPdf) _session.CropPdfPage(sel.Page, sel.Rect);
+        if (_session.IsPdf)
+            _session.CropPdfPages(allPages ? Enumerable.Range(0, _session.PageCount).ToList() : [sel.Page], sel.Page, sel.Rect);
         else _session.CropImage(sel.Page, sel.Rect);
         DocView.Tool = Tool.Select;
+    }
+
+    /// <summary>Toolbar button: crops when there's a selection, otherwise starts one.</summary>
+    private void CropOrStartSelection()
+    {
+        if (DocView.RectSelection != null) { Crop(); return; }
+        DocView.Tool = Tool.RectSelect;
+        ShowInfo("Drag over the area to keep", "Adjust it with the handles, then choose Crop or press Enter.");
+    }
+
+    private void ResetCrop(bool allPages)
+    {
+        if (_session is not { IsPdf: true } s) return;
+        s.ResetCrop(allPages ? Enumerable.Range(0, s.PageCount).ToList() : SelectedPages());
     }
 
     // ---------------- Keyboard ----------------
@@ -187,6 +209,11 @@ public sealed partial class MainWindow
             case VirtualKey.L when ctrl: RotateCurrent(false); break;
             case VirtualKey.R when ctrl: RotateCurrent(true); break;
             case VirtualKey.K when ctrl: Crop(); break;
+            // Enter applies a pending crop, unless it's meant for a text field or a focused button.
+            case VirtualKey.Enter when !ctrl && DocView.RectSelection != null
+                && e.OriginalSource is not (TextBox or PasswordBox or NumberBox or AutoSuggestBox or Microsoft.UI.Xaml.Controls.Primitives.ButtonBase):
+                Crop();
+                break;
             case VirtualKey.I when ctrl: _ = ShowInspectorAsync(); break;
             case VirtualKey.Number1 when ctrl && alt: ToggleSidebar(false); break;
             case VirtualKey.Number2 when ctrl && alt: ShowSidebarTab(ThumbsTab); break;
