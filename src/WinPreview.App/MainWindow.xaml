@@ -10,9 +10,11 @@
         <MicaBackdrop />
     </Window.SystemBackdrop>
 
-    <Grid x:Name="Root" AllowDrop="True" DragOver="Root_DragOver" Drop="Root_Drop" KeyDown="Root_KeyDown">
+    <!-- A transparent background makes the whole window a drop target (empty XAML areas don't hit-test otherwise). -->
+    <Grid x:Name="Root" Background="Transparent" AllowDrop="True" DragOver="Root_DragOver" DragLeave="Root_DragLeave" Drop="Root_Drop" KeyDown="Root_KeyDown">
         <Grid.RowDefinitions>
             <RowDefinition Height="48" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
@@ -82,7 +84,13 @@
         </Grid>
 
         <!-- ===== Markup toolbar ===== -->
-        <Border x:Name="MarkupBar" Grid.Row="1" Visibility="Collapsed" Padding="8,4"
+        <!-- ===== Tabs (shown when several documents are open in this window) ===== -->
+        <TabView x:Name="Tabs" Grid.Row="1" Visibility="Collapsed" IsAddTabButtonVisible="True" CanReorderTabs="True"
+                 TabWidthMode="Equal" Padding="8,0,8,0" Background="Transparent"
+                 AddTabButtonClick="Tabs_AddTabButtonClick" TabCloseRequested="Tabs_TabCloseRequested"
+                 SelectionChanged="Tabs_SelectionChanged" />
+
+        <Border x:Name="MarkupBar" Grid.Row="2" Visibility="Collapsed" Padding="8,4"
                 Background="{ThemeResource LayerFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,1,0,1">
             <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" HorizontalScrollMode="Auto">
                 <StackPanel x:Name="MarkupTools" Orientation="Horizontal" Spacing="2" />
@@ -90,7 +98,7 @@
         </Border>
 
         <!-- ===== Body ===== -->
-        <Grid Grid.Row="2">
+        <Grid Grid.Row="3">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition x:Name="SidebarColumn" Width="210" />
                 <ColumnDefinition Width="*" />
@@ -213,5 +221,12 @@
 
             <InfoBar x:Name="Info" Grid.ColumnSpan="2" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="16" MaxWidth="560" IsOpen="False" />
         </Grid>
+
+        <!-- Shown while files are dragged over the window -->
+        <Border x:Name="DropOverlay" Grid.Row="1" Grid.RowSpan="3" Visibility="Collapsed" IsHitTestVisible="False" Margin="10"
+                CornerRadius="10" BorderThickness="3" BorderBrush="{ThemeResource AccentFillColorDefaultBrush}"
+                Background="{ThemeResource AccentFillColorSecondaryBrush}" Opacity="0.35">
+            <TextBlock x:Name="DropOverlayText" Text="Drop to open" FontSize="22" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+        </Border>
     </Grid>
 </Window>

@@ -88,7 +88,7 @@ public sealed partial class MainWindow
         bar.Add(Separator());
 
         _cropButton = new Button { Content = Glyph(""), Style = (Style)Application.Current.Resources["ToolButtonStyle"] };
-        ToolTipService.SetToolTip(_cropButton, "Crop — drag over the area to keep, then press Enter (Ctrl+K)");
+        ToolTipService.SetToolTip(_cropButton, "Crop — drag over the area to keep, then press Enter (shortcut: C)");
         _cropButton.Click += (_, _) => CropOrStartSelection();
         bar.Add(_cropButton);
 

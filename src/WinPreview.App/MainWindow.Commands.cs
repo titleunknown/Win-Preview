@@ -63,7 +63,7 @@ public sealed partial class MainWindow
             foreach (var item in tmp.Items.ToList()) { tmp.Items.Remove(item); pages.Items.Add(item); }
             m.Add(pages);
         }
-        Add("Crop to Selection", "", () => Crop(), "Ctrl+K", DocView.RectSelection != null);
+        Add("Crop to Selection", "", () => Crop(), "C", DocView.RectSelection != null);
         if (pdf)
         {
             Add("Crop All Pages to Selection", "", () => Crop(allPages: true), null, DocView.RectSelection != null);
@@ -81,6 +81,15 @@ public sealed partial class MainWindow
         Add("Zoom to Width", "", () => DocView.SetFit(FitMode.Width), null, has);
         Add("Slideshow", "", StartSlideshow, "F5", has);
         m.Add(new MenuFlyoutSeparator());
+        var tabsItem = new ToggleMenuFlyoutItem { Text = "Open Files in Tabs", IsChecked = AppSettings.Current.OpenInTabs, Icon = new FontIcon { Glyph = "" } };
+        tabsItem.Click += (_, _) =>
+        {
+            AppSettings.Current.OpenInTabs = tabsItem.IsChecked;
+            AppSettings.Save();
+            ShowInfo(tabsItem.IsChecked ? "Files now open in tabs" : "Files now open in new windows",
+                tabsItem.IsChecked ? "New files join this window as tabs." : "Each new file opens in its own window.");
+        };
+        m.Add(tabsItem);
         Add("Document Info", "", () => _ = ShowInspectorAsync(), "Ctrl+I", has);
         Add("Keyboard Shortcuts", "", () => _ = ShowShortcutsAsync());
     }
@@ -192,7 +201,7 @@ public sealed partial class MainWindow
             case VirtualKey.S when ctrl && alt: ToggleSidebar(); break;
             case VirtualKey.S when ctrl && shift: _ = SaveAsAsync(); break;
             case VirtualKey.S when ctrl: _ = SaveAsync(); break;
-            case VirtualKey.W when ctrl: _ = RequestCloseAsync(); break;
+            case VirtualKey.W when ctrl: _ = CloseCurrentTabAsync(); break;
             case VirtualKey.P when ctrl: _ = PrintAsync(); break;
             case VirtualKey.Z when ctrl && shift && !inText: Redo(); break;
             case VirtualKey.Z when ctrl && !inText: Undo(); break;
@@ -208,7 +217,13 @@ public sealed partial class MainWindow
             case VirtualKey.Number9 when ctrl: DocView.SetFit(FitMode.Page); break;
             case VirtualKey.L when ctrl: RotateCurrent(false); break;
             case VirtualKey.R when ctrl: RotateCurrent(true); break;
-            case VirtualKey.K when ctrl: Crop(); break;
+            case VirtualKey.K when ctrl: CropOrStartSelection(); break;
+            // C starts a crop selection, or crops if there already is one. Not while typing into a field, a text box
+            // or a PDF form, and not on a focused button (where the letter does nothing anyway).
+            case VirtualKey.C when !ctrl && !alt && !shift && _session != null && !DocView.IsTypingIntoDocument
+                && e.OriginalSource is not (TextBox or PasswordBox or NumberBox or AutoSuggestBox or Microsoft.UI.Xaml.Controls.Primitives.ButtonBase):
+                CropOrStartSelection();
+                break;
             // Enter applies a pending crop, unless it's meant for a text field or a focused button.
             case VirtualKey.Enter when !ctrl && DocView.RectSelection != null
                 && e.OriginalSource is not (TextBox or PasswordBox or NumberBox or AutoSuggestBox or Microsoft.UI.Xaml.Controls.Primitives.ButtonBase):
@@ -231,7 +246,8 @@ public sealed partial class MainWindow
 
     private void InitPicker(object picker) => InitializeWithWindow.Initialize(picker, Hwnd);
 
-    private async Task OpenAsync()
+    /// <param name="asTabs">Open into this window as new tabs, whatever the "Open Files in Tabs" setting says.</param>
+    private async Task OpenAsync(bool asTabs = false)
     {
         var picker = new FileOpenPicker { SuggestedStartLocation = PickerLocationId.DocumentsLibrary, ViewMode = PickerViewMode.Thumbnail };
         picker.FileTypeFilter.Add(".pdf");
@@ -239,7 +255,7 @@ public sealed partial class MainWindow
         InitPicker(picker);
         var files = await picker.PickMultipleFilesAsync();
         if (files.Count == 0) return;
-        await App.Current.OpenFilesAsync(files.Select(f => f.Path).ToList(), this);
+        await App.Current.OpenFilesAsync(files.Select(f => f.Path).ToList(), this, asTabs);
     }
 
     private async Task NewFromClipboardAsync()
@@ -253,8 +269,9 @@ public sealed partial class MainWindow
         var reference = await content.GetBitmapAsync();
         using var stream = await reference.OpenReadAsync();
         var frames = await ImageCodec.DecodeAsync(stream);
-        var target = HasDocument ? App.Current.OpenWindow(null) : this;
-        target.SetSession(DocumentSession.FromImages(frames, null));
+        var session = DocumentSession.FromImages(frames, null);
+        if (!HasDocument || AppSettings.Current.OpenInTabs) AddDocument(session);
+        else App.Current.OpenWindowWithSession(session);
     }
 
     private async Task InsertFromFileAsync(int at)
@@ -522,9 +539,10 @@ public sealed partial class MainWindow
             Ctrl+F	Search                     Ctrl+G	Next match (Shift: previous)
             Ctrl+= / Ctrl+−	Zoom in / out      Ctrl+0	Actual size
             Ctrl+9	Zoom to fit                Ctrl+L / Ctrl+R	Rotate left / right
-            Ctrl+K	Crop to selection          Ctrl+I	Document info
+            C	Crop (also Ctrl+K)          Ctrl+I	Document info
             Ctrl+Shift+A	Markup toolbar       Ctrl+Alt+S	Sidebar
             Ctrl+Alt+2/3/4	Thumbnails / Contents / Highlights & Notes
+            Ctrl+W	Close tab (or window)   Ctrl+Tab	Next tab (Shift: previous)
             F5	Slideshow                     Delete	Delete selected markup or pages
             Shift (while drawing)	Constrain shapes and lines
             """;

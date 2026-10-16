@@ -21,6 +21,8 @@ Organized by the chapters of Apple's [Preview User Guide](https://support.apple.
 | See where a photo was taken | ⬜ | Needs EXIF GPS and a map. |
 | Import images from a camera | ⬜ | |
 | Slideshow | ✅ | F5; arrows, space and click to advance. |
+| Tabs | ✅ | Optional: turn on **Open Files in Tabs** in the More menu and files join the current window as tabs (also the **+** button and drag-and-drop). Each tab keeps its own zoom, scroll position, sidebar and unsaved changes; Ctrl+Tab switches, Ctrl+W closes. Right-click a tab to move it to its own window. Off by default (one window per file). |
+| Drag and drop to open | ✅ | The whole window is a drop target and highlights while files are dragged over it. |
 | Animated GIF frames | ✅ | Composited frames appear as pages. |
 
 ## Edit PDFs
@@ -39,7 +41,7 @@ Organized by the chapters of Apple's [Preview User Guide](https://support.apple.
 | Text boxes | ✅ | Grows as you type. Helvetica, Times or Courier, with size and color. |
 | Combine PDFs | ✅ | Insert from file, or drop files on the thumbnails. |
 | Add, delete, move and rotate pages | ✅ | Add Page and Remove buttons under the thumbnails (blank page or pages from a file), plus drag to reorder. All undoable. |
-| Crop PDF pages | ✅ | Click the Crop button (or use the rectangular selection tool) and drag over the area to keep. Adjust with the handles or move it; the rest is dimmed, with a size readout. Crop one page or **All pages** from the floating button (Enter also works). Non-destructive: **Reset Crop** in the More menu restores the full page. Works on rotated pages. |
+| Crop PDF pages | ✅ | Press **C** or click the Crop button (or use the rectangular selection tool) and drag over the area to keep. Adjust with the handles or move it; the rest is dimmed, with a size readout. Crop one page or **All pages** from the floating button (Enter also works). Non-destructive: **Reset Crop** in the More menu restores the full page. Works on rotated pages. |
 | Quartz filter effects | ⬜ | |
 | Redaction | ⬜ | Planned; see [ROADMAP.md](ROADMAP.md). |
 

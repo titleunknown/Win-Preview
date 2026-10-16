@@ -6,7 +6,14 @@ Planned work, roughly in priority order. [FEATURES.md](FEATURES.md) tracks parit
 
 - Better crop: adjustable selection with handles, dimmed surroundings, thirds grid and size readout, a floating
   Crop button, aspect-ratio presets, crop all PDF pages, and Reset Crop
+- Optional tabs: open files as tabs in one window (More → Open Files in Tabs), move a tab to its own window
+- **C** is now the shortcut for crop
+- The whole window accepts dropped files (not just the middle), with a highlight while dragging
+- The window can't be made smaller than 780 × 480
 - Fix: a leftover empty message bar could stay on screen after a notice closed
+
+Known gap: opening a file from File Explorer while Win-Preview is already running starts a second window rather
+than adding a tab (each launch is its own process). Single-instance handling would fix that.
 
 ## Later
 

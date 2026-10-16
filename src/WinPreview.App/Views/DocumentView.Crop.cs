@@ -43,6 +43,9 @@ public sealed partial class DocumentView
         }
     }
 
+    /// <summary>True while keystrokes belong to the document: a PDF form field or a text box being edited.</summary>
+    public bool IsTypingIntoDocument => _formPage >= 0 || _editing != null;
+
     private double? CropRatioFor(PageView pv) => CropMath.ResolveRatio(_cropAspect, pv.Width, pv.Height);
 
     private static RectD PageBoundsDip(PageView pv) => new(0, 0, pv.Width, pv.Height);

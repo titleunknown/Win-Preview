@@ -28,7 +28,13 @@ public partial class App : Application
             OpenWindow(null);
             return;
         }
-        // Preview opens images given together in one window, and each PDF in its own.
+        // With tabs, everything opens in one window. Otherwise, like Preview: images given together share a window
+        // and each PDF gets its own.
+        if (AppSettings.Current.OpenInTabs)
+        {
+            OpenWindow(files);
+            return;
+        }
         var pdfs = files.Where(Session.DocumentSession.LooksLikePdf).ToList();
         var images = files.Except(pdfs).ToList();
         foreach (var pdf in pdfs) OpenWindow([pdf]);
@@ -37,20 +43,37 @@ public partial class App : Application
 
     public MainWindow OpenWindow(IReadOnlyList<string>? files)
     {
-        var w = new MainWindow();
-        _windows.Add(w);
-        w.Closed += (_, _) => _windows.Remove(w);
-        w.Activate();
+        var w = NewWindow();
         if (files is { Count: > 0 }) _ = w.OpenFilesAsync(files);
         return w;
     }
 
-    /// <summary>Reuses an empty window if there is one, otherwise opens a new window.</summary>
-    public async Task OpenFilesAsync(IReadOnlyList<string> files, MainWindow? requester)
+    /// <summary>Opens a window that takes over an already-open document (moving a tab out of another window).</summary>
+    public MainWindow OpenWindowWithSession(Session.DocumentSession session)
     {
-        if (requester is { HasDocument: false })
+        var w = NewWindow();
+        _ = w.AdoptSessionAsync(session);
+        return w;
+    }
+
+    private MainWindow NewWindow()
+    {
+        var w = new MainWindow();
+        _windows.Add(w);
+        w.Closed += (_, _) => _windows.Remove(w);
+        w.Activate();
+        return w;
+    }
+
+    /// <summary>
+    /// Opens files from a window. They join that window as tabs when it is empty, when "Open Files in Tabs" is on,
+    /// or when <paramref name="asTabs"/> is set; otherwise each opens in a new window.
+    /// </summary>
+    public async Task OpenFilesAsync(IReadOnlyList<string> files, MainWindow? requester, bool asTabs = false)
+    {
+        if (requester != null && (!requester.HasDocument || asTabs || AppSettings.Current.OpenInTabs))
         {
-            await requester.OpenFilesAsync(files);
+            await requester.OpenFilesAsync(files, asTabs);
             return;
         }
         OpenWindow(files);

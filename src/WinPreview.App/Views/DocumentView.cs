@@ -368,4 +368,25 @@ public sealed partial class DocumentView : Grid
     }
 
     public void FocusSurface() => _scroll.Focus(FocusState.Programmatic);
+
+    /// <summary>Zoom and scroll position, kept per tab so switching back restores where you were.</summary>
+    public sealed record ViewState(double Zoom, FitMode Fit, double HorizontalOffset, double VerticalOffset);
+
+    public ViewState CaptureState() => new(Zoom, Fit, _scroll.HorizontalOffset, _scroll.VerticalOffset);
+
+    /// <summary>Call after <see cref="Attach"/> while the view is visible.</summary>
+    public void RestoreState(ViewState state)
+    {
+        Fit = state.Fit;
+        if (state.Fit == FitMode.None) SetZoomCore(Math.Clamp(state.Zoom, ZoomSteps[0], ZoomSteps[^1]), null);
+        else ApplyFit();
+        ZoomChanged?.Invoke();
+        // Scroll once the new layout has been measured.
+        _dispatcher.TryEnqueue(DispatcherQueuePriority.Low, () =>
+        {
+            _content.UpdateLayout();
+            _scroll.ChangeView(state.HorizontalOffset, state.VerticalOffset, null, true);
+            ScheduleRender();
+        });
+    }
 }

@@ -15,6 +15,7 @@ public sealed partial class MainWindow : Window
     private DocumentSession? _session;
     private readonly SignatureStore _signatures = new();
     private bool _closeConfirmed;
+    private const double MinWindowWidth = 780, MinWindowHeight = 480;
     /// <summary>Completes once the window content is loaded; dialogs (e.g. the password prompt) need a XamlRoot.</summary>
     private readonly TaskCompletionSource _loaded = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -29,12 +30,20 @@ public sealed partial class MainWindow : Window
         Root.Loaded += (_, _) =>
         {
             double scale = Root.XamlRoot.RasterizationScale;
+            // Below this width the toolbar overlaps itself, so don't let the window get that small.
+            if (AppWindow.Presenter is OverlappedPresenter presenter)
+            {
+                presenter.PreferredMinimumWidth = (int)(MinWindowWidth * scale);
+                presenter.PreferredMinimumHeight = (int)(MinWindowHeight * scale);
+            }
             AppWindow.Resize(new SizeInt32((int)(1180 * scale), (int)(860 * scale)));
             UpdateCaptionInset();
             _loaded.TrySetResult();
         };
         Root.SizeChanged += (_, _) => UpdateCaptionInset();
         AppWindow.Closing += OnClosing;
+        AppSettings.Changed += UpdateTabStrip;
+        Closed += (_, _) => AppSettings.Changed -= UpdateTabStrip;
 
         DocView.CurrentPageChanged += OnCurrentPageChanged;
         DocView.ZoomChanged += UpdateSubtitle;
@@ -60,60 +69,41 @@ public sealed partial class MainWindow : Window
 
     // ---------------- Opening ----------------
 
-    public async Task OpenFilesAsync(IReadOnlyList<string> files)
+    /// <summary>Opens files here. Each PDF is its own document; several images given together share one.</summary>
+    public async Task OpenFilesAsync(IReadOnlyList<string> files, bool asTabs = false)
     {
-        try
+        await _loaded.Task; // a file given on the command line is opened before the window has loaded
+        var groups = files.Count > 1 && files.All(ImageCodec.IsImage)
+            ? new List<IReadOnlyList<string>> { files }
+            : files.Select(f => (IReadOnlyList<string>)[f]).ToList();
+        for (int i = 0; i < groups.Count; i++)
         {
-            await _loaded.Task; // a file given on the command line is opened before the window has loaded
-            DocumentSession session;
-            if (files.Count > 1 && files.All(ImageCodec.IsImage))
+            // Without tabs, only the first file takes this window; the rest get their own.
+            if (i > 0 && !asTabs && !AppSettings.Current.OpenInTabs)
             {
-                // Several images open together as one multi-page window, like Preview.
-                var frames = new List<ImageFrame>();
-                foreach (var f in files) frames.AddRange(await ImageCodec.DecodeAsync(f));
-                session = DocumentSession.FromImages(frames, files.Count == 1 ? files[0] : null);
+                App.Current.OpenWindow(groups[i]);
+                continue;
             }
-            else
+            try
             {
-                foreach (var extra in files.Skip(1)) App.Current.OpenWindow([extra]);
-                session = await DocumentSession.OpenAsync(files[0], wrong => PromptPasswordAsync(Path.GetFileName(files[0]), wrong));
+                var group = groups[i];
+                DocumentSession session;
+                if (group.Count > 1)
+                {
+                    // Several images open together as one multi-page document, like Preview.
+                    var frames = new List<ImageFrame>();
+                    foreach (var f in group) frames.AddRange(await ImageCodec.DecodeAsync(f));
+                    session = DocumentSession.FromImages(frames, null);
+                }
+                else session = await DocumentSession.OpenAsync(group[0], wrong => PromptPasswordAsync(Path.GetFileName(group[0]), wrong));
+                AddDocument(session);
             }
-            SetSession(session);
+            catch (OperationCanceledException) { }
+            catch (Exception ex)
+            {
+                ShowError("Couldn't open the file", ex.Message);
+            }
         }
-        catch (OperationCanceledException) { }
-        catch (Exception ex)
-        {
-            ShowError("Couldn't open the file", ex.Message);
-        }
-    }
-
-    private void SetSession(DocumentSession session)
-    {
-        if (_session != null)
-        {
-            _session.DirtyChanged -= UpdateChrome;
-            _session.EncryptionChanged -= UpdateChrome;
-            _session.StructureChanged -= OnStructureChanged;
-            _session.MarkupsChanged -= OnMarkupsChanged;
-            _session.Undo.Changed -= UpdateChrome;
-            DocView.Detach();
-            _session.Dispose();
-        }
-        _session = session;
-        session.DirtyChanged += UpdateChrome;
-        session.EncryptionChanged += UpdateChrome;
-        session.StructureChanged += OnStructureChanged;
-        session.MarkupsChanged += OnMarkupsChanged;
-        session.Undo.Changed += UpdateChrome;
-        ClearSearch();
-        DocView.Tool = Tool.Select;
-        // Like Preview, a single image opens without the sidebar; the sidebar button shows it.
-        _sidebarVisible = session.IsPdf || session.PageCount > 1;
-        DocView.Attach(session);
-        RebuildSidebar();
-        UpdateChrome();
-        DocView.FocusSurface();
-        WarmUpLiveText(0);
     }
 
     private void OnStructureChanged() => DispatcherQueue.TryEnqueue(() =>
@@ -225,59 +215,39 @@ public sealed partial class MainWindow : Window
 
     private async void OnClosing(AppWindow sender, AppWindowClosingEventArgs args)
     {
-        if (_closeConfirmed || _session is not { IsDirty: true }) { Cleanup(); return; }
+        DocView.CommitInlineEditor();
+        if (_closeConfirmed || !_tabs.Any(t => t.Session.IsDirty)) { Cleanup(); return; }
         args.Cancel = true;
         await RequestCloseAsync();
     }
 
-    /// <summary>Closes the window, first offering to save unsaved changes. (Window.Close() skips AppWindow.Closing.)</summary>
+    /// <summary>Closes the window, first offering to save every document with unsaved changes. (Window.Close() skips AppWindow.Closing.)</summary>
     public async Task RequestCloseAsync()
     {
         DocView.CommitInlineEditor();
-        if (_session is not { IsDirty: true })
-        {
-            Cleanup();
-            _closeConfirmed = true;
-            Close();
-            return;
-        }
-        var dlg = new ContentDialog
-        {
-            XamlRoot = Root.XamlRoot,
-            Title = $"Do you want to save changes to “{_session.DisplayName}”?",
-            Content = "Your changes will be lost if you don't save them.",
-            PrimaryButtonText = "Save", SecondaryButtonText = "Don't Save", CloseButtonText = "Cancel",
-            DefaultButton = ContentDialogButton.Primary,
-        };
-        var result = await dlg.ShowAsync();
-        if (result == ContentDialogResult.None) return;
-        if (result == ContentDialogResult.Primary && !await SaveAsync()) return;
+        foreach (var tab in TabsInOrder())
+            if (!await ConfirmCloseAsync(tab)) return;
         Cleanup();
         _closeConfirmed = true;
         Close();
-    }
-
-    private void Cleanup()
-    {
-        _thumbCts?.Cancel();
-        DocView.Detach();
-        _session?.Dispose();
-        _session = null;
     }
 
     // ---------------- Drag & drop ----------------
 
     private void Root_DragOver(object sender, DragEventArgs e)
     {
-        if (e.DataView.Contains(StandardDataFormats.StorageItems))
-        {
-            e.AcceptedOperation = DataPackageOperation.Copy;
-            e.DragUIOverride.Caption = "Open";
-        }
+        if (!e.DataView.Contains(StandardDataFormats.StorageItems)) return;
+        e.AcceptedOperation = DataPackageOperation.Copy;
+        e.DragUIOverride.Caption = AppSettings.Current.OpenInTabs && HasDocument ? "Open in a new tab" : "Open";
+        DropOverlayText.Text = AppSettings.Current.OpenInTabs && HasDocument ? "Drop to open in a new tab" : "Drop to open";
+        DropOverlay.Visibility = Visibility.Visible;
     }
+
+    private void Root_DragLeave(object sender, DragEventArgs e) => DropOverlay.Visibility = Visibility.Collapsed;
 
     private async void Root_Drop(object sender, DragEventArgs e)
     {
+        DropOverlay.Visibility = Visibility.Collapsed;
         if (!e.DataView.Contains(StandardDataFormats.StorageItems)) return;
         var items = await e.DataView.GetStorageItemsAsync();
         var files = items.OfType<StorageFile>().Select(f => f.Path).Where(p => DocumentSession.LooksLikePdf(p) || ImageCodec.IsImage(p)).ToList();
