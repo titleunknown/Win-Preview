@@ -28,7 +28,6 @@ public sealed partial class MainWindow
     private readonly Dictionary<Tool, ToggleButton> _toolButtons = [];
     private DropDownButton? _shapeButton, _signButton, _widthButton, _strokeButton, _fillButton, _textButton;
     private Button? _cropButton, _sizeButton;
-    private TextBlock _aspectLabel = new();
     private ToggleButton? _alphaButton;
     private SplitButton? _removeBgButton;
     private Rectangle? _strokeSwatch, _fillSwatch;
@@ -91,26 +90,6 @@ public sealed partial class MainWindow
         ToolTipService.SetToolTip(_cropButton, "Crop — drag over the area to keep, then press Enter (shortcut: C)");
         _cropButton.Click += (_, _) => CropOrStartSelection();
         bar.Add(_cropButton);
-
-        _aspectLabel = new TextBlock { Text = "Free", FontSize = 12 };
-        var aspectButton = StyleDropDown(_aspectLabel, "Crop shape — free, or lock to an aspect ratio");
-        var aspects = new MenuFlyout();
-        foreach (var (name, value) in new (string, double?)[]
-        {
-            ("Free", null), ("Same as page", -1), ("Square (1:1)", 1), ("4:3", 4.0 / 3), ("3:2", 3.0 / 2), ("16:9", 16.0 / 9), ("5:4", 5.0 / 4),
-        })
-        {
-            var item = new RadioMenuFlyoutItem { Text = name, GroupName = "crop-aspect", IsChecked = value == null };
-            item.Click += (_, _) =>
-            {
-                _aspectLabel.Text = value == null ? "Free" : name.Split(' ')[0] is "Square" ? "1:1" : name == "Same as page" ? "Page" : name;
-                DocView.CropAspect = value;
-                DocView.FocusSurface();
-            };
-            aspects.Items.Add(item);
-        }
-        aspectButton.Flyout = aspects;
-        bar.Add(aspectButton);
 
         _sizeButton = new Button { Content = Glyph(""), Style = (Style)Application.Current.Resources["ToolButtonStyle"] };
         ToolTipService.SetToolTip(_sizeButton, "Adjust size…");

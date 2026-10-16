@@ -5,10 +5,10 @@ Planned work, roughly in priority order. [FEATURES.md](FEATURES.md) tracks parit
 ## Next release (v0.3), in the repository now
 
 - Better crop: adjustable selection with handles, dimmed surroundings, thirds grid and size readout, a floating
-  Crop button, aspect-ratio presets, crop all PDF pages, and Reset Crop
+  Crop button, an Aspect ratio bar (1:1, 4:5, 2:3, 3:2, 16:9, 9:16 and more, with a portrait/landscape swap), crop all PDF pages, and Reset Crop
 - Optional tabs: open files as tabs in one window (More → Open Files in Tabs), move a tab to its own window
 - **C** is now the shortcut for crop
-- Zoom tool: press **Z** (or the magnifier button), then double-click to jump between 100% and fit-to-window, zoomed around the point you clicked. When the picture is bigger than the window the cursor becomes a hand and dragging pans (also in the Select tool). Custom magnifier and hand cursors.
+- Zoom tool: press **Z** (or the magnifier button), then double-click to jump between 100% and fit-to-window, zoomed around the point you clicked. When the picture is bigger than the window the cursor becomes a hand and dragging pans in the Zoom tool (Select keeps the standard arrow). Custom magnifier and hand cursors.
 - The whole window accepts dropped files (not just the middle), with a highlight while dragging
 - The window can't be made smaller than 780 × 480
 - Fix: a leftover empty message bar could stay on screen after a notice closed

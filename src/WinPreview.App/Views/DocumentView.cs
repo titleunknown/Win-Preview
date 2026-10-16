@@ -68,6 +68,7 @@ public sealed partial class DocumentView : Grid
         _scroll.AddHandler(PointerWheelChangedEvent, new PointerEventHandler(OnPointerWheel), true);
         PreviewKeyDown += OnPreviewKeyDown;
         ZoomChanged += RefreshHoverCursor;
+        SelectionChanged += UpdateCropBar;
         CharacterReceived += OnCharacterReceived;
     }
 
@@ -96,6 +97,7 @@ public sealed partial class DocumentView : Grid
             _tool = value;
             if (value != Tool.Select && value != Tool.Highlight) ClearTextSelection();
             if (value != Tool.RectSelect) ClearRectSelection();
+            UpdateCropBar();
             ToolChanged?.Invoke();
             RefreshHoverCursor();
         }

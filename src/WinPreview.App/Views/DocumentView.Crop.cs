@@ -32,6 +32,7 @@ public sealed partial class DocumentView
         set
         {
             _cropAspect = value;
+            UpdateCropBar();
             if (_rectSel is { } sel && sel.Page < _pages.Count && CropRatioFor(_pages[sel.Page]) is { } k)
             {
                 // Re-fit the existing selection around its center.
@@ -41,6 +42,95 @@ public sealed partial class DocumentView
                 SetCrop(pv, new RectD(r.Center.X - w / 2, r.Center.Y - h / 2, r.Center.X + w / 2, r.Center.Y + h / 2));
             }
         }
+    }
+
+    /// <summary>The aspect ratios offered for cropping: label and width ÷ height (null = free, negative = same as the page).</summary>
+    private static readonly (string Name, double? Value)[] CropAspects =
+    [
+        ("Free", null), ("Same as page", -1), ("1:1", 1),
+        ("4:5", 4.0 / 5), ("5:4", 5.0 / 4), ("2:3", 2.0 / 3), ("3:2", 3.0 / 2),
+        ("3:4", 3.0 / 4), ("4:3", 4.0 / 3), ("9:16", 9.0 / 16), ("16:9", 16.0 / 9),
+    ];
+
+    private Border? _cropBar;
+    private TextBlock? _cropBarLabel;
+    private Button? _cropSwap;
+
+    private static string CropAspectName(double? v) =>
+        CropAspects.FirstOrDefault(a => a.Value == v || a.Value is { } x && v is { } y && Math.Abs(x - y) < 1e-9).Name ?? "Custom";
+
+    /// <summary>Builds the floating "Aspect ratio" bar shown while cropping (created on first use).</summary>
+    private void EnsureCropBar()
+    {
+        if (_cropBar != null) return;
+        _cropBarLabel = new TextBlock { FontSize = 12 };
+        var picker = new DropDownButton
+        {
+            Content = new StackPanel
+            {
+                Orientation = Orientation.Horizontal, Spacing = 6,
+                Children = { new TextBlock { Text = "Aspect ratio", FontSize = 12, Opacity = 0.7 }, _cropBarLabel },
+            },
+            Padding = new Thickness(10, 4, 8, 4),
+        };
+        ToolTipService.SetToolTip(picker, "Lock the crop to a shape, or crop freely");
+        var menu = new MenuFlyout();
+        menu.Opening += (_, _) =>
+        {
+            menu.Items.Clear();
+            foreach (var (name, value) in CropAspects)
+            {
+                if (name == "4:5") menu.Items.Add(new MenuFlyoutSeparator());
+                var item = new RadioMenuFlyoutItem
+                {
+                    Text = name == "Same as page" ? "Same as page" : name, GroupName = "crop-aspect",
+                    IsChecked = CropAspectName(_cropAspect) == name,
+                };
+                item.Click += (_, _) => { CropAspect = value; FocusSurface(); };
+                menu.Items.Add(item);
+            }
+        };
+        picker.Flyout = menu;
+
+        _cropSwap = new Button { Content = new FontIcon { Glyph = "", FontSize = 14 }, Padding = new Thickness(8, 5, 8, 5) };
+        ToolTipService.SetToolTip(_cropSwap, "Swap portrait and landscape");
+        _cropSwap.Click += (_, _) => { SwapCropOrientation(); FocusSurface(); };
+
+        _cropBar = new Border
+        {
+            Child = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Children = { picker, _cropSwap } },
+            Padding = new Thickness(6), CornerRadius = new CornerRadius(8),
+            HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 10, 0, 0),
+            Background = (Brush)Application.Current.Resources["AcrylicBackgroundFillColorDefaultBrush"],
+            BorderBrush = (Brush)Application.Current.Resources["SurfaceStrokeColorDefaultBrush"], BorderThickness = new Thickness(1),
+            Visibility = Visibility.Collapsed,
+        };
+        Children.Add(_cropBar);
+    }
+
+    /// <summary>Shows the aspect bar while the crop tool is active or a crop selection exists, and keeps it in sync.</summary>
+    private void UpdateCropBar()
+    {
+        bool show = _session != null && (Tool == Tool.RectSelect || _rectSel != null);
+        if (!show && _cropBar == null) return;
+        EnsureCropBar();
+        _cropBar!.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        if (!show) return;
+        _cropBarLabel!.Text = CropAspectName(_cropAspect);
+        _cropSwap!.IsEnabled = _cropAspect is { } k && Math.Abs(k) > 0 && (k < 0 || Math.Abs(k - 1) > 1e-9);
+    }
+
+    /// <summary>Turns a landscape lock into portrait and vice versa (4:5 ⇄ 5:4).</summary>
+    private void SwapCropOrientation()
+    {
+        if (_cropAspect is not { } k) return;
+        if (k < 0)
+        {
+            var sel = _rectSel is { } s && s.Page < _pages.Count ? _pages[s.Page] : _pages.FirstOrDefault();
+            if (sel == null) return;
+            k = sel.Width / Math.Max(1e-9, sel.Height);
+        }
+        CropAspect = 1 / k;
     }
 
     /// <summary>True while keystrokes belong to the document: a PDF form field or a text box being edited.</summary>

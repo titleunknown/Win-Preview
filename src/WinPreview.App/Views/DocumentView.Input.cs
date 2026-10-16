@@ -118,9 +118,7 @@ public sealed partial class DocumentView
                 else
                 {
                     ClearTextSelection();
-                    // Zoomed in past the window, dragging pans (as in most photo viewers); otherwise it selects an area.
                     if (TryBeginCropEdit(pv, e, dip)) return;
-                    if (CanPan(pv)) { BeginPan(pv, e); return; }
                     ClearRectSelection();
                     BeginDrag(pv, e, DragKind.RectSelect);
                 }
@@ -452,8 +450,6 @@ public sealed partial class DocumentView
                     pdf.FormMouseMove(pv.Index, user, 0);
                 }
                 else if (_session.GetTextLayer(pv.Index)?.GetCharIndexAt(user, pv.Mapping.UserLength(2)) >= 0) shape = InputSystemCursorShape.IBeam;
-                else if (pdf == null && CanPan(pv)) { pv.SetCursor(AppCursors.HandOpen); return; }
-                else if (pdf == null) shape = InputSystemCursorShape.Cross;
                 break;
             }
             case Tool.Text: shape = InputSystemCursorShape.IBeam; break;
