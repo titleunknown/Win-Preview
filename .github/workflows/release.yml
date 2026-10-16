@@ -3,7 +3,7 @@ name: Release
 # Builds Win-Preview on a GitHub-hosted runner, signs it with SignPath when that's configured, and attaches
 # the zip to a draft GitHub release. See docs/CODE_SIGNING.md.
 #
-#   git tag v0.2 && git push origin v0.2        -> builds, signs (if configured) and drafts the release
+#   git tag v0.3 && git push origin v0.3        -> builds, signs (if configured) and drafts the release
 #   Actions → Release → Run workflow            -> builds a test package and uploads it as a workflow artifact
 
 on:
@@ -125,5 +125,7 @@ jobs:
           if ($LASTEXITCODE -eq 0) {
             gh release upload $env:TAG $env:ZIP "$env:ZIP.sha256" --clobber
           } else {
-            gh release create $env:TAG $env:ZIP "$env:ZIP.sha256" --draft --title "Win-Preview $env:TAG" --generate-notes
+            # Use the hand-written notes in release-notes/<tag>.md when there are some, otherwise let GitHub generate them.
+            $notes = if (Test-Path "release-notes/$env:TAG.md") { @('--notes-file', "release-notes/$env:TAG.md") } else { @('--generate-notes') }
+            gh release create $env:TAG $env:ZIP "$env:ZIP.sha256" --draft --title "Win-Preview $env:TAG" @notes
           }

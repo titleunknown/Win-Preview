@@ -77,14 +77,14 @@ Ask for their view in the application form so you know before investing in the s
 ## Release process
 
 ```bash
-git tag v0.2
-git push origin v0.2
+git tag v0.3
+git push origin v0.3
 ```
 
 1. GitHub Actions builds, tests and publishes the app.
 2. If SignPath is configured, the build is submitted for signing; **you approve the request** in SignPath (every
    release needs a manual approval).
-3. The workflow verifies the signatures, packages `Win-Preview-v0.2-win-x64.zip` plus a `.sha256` file and creates a
+3. The workflow verifies the signatures, packages `Win-Preview-v0.3-win-x64.zip` plus a `.sha256` file and creates a
    **draft** release. Review the notes and click Publish.
 
 Without SignPath variables the same workflow produces an unsigned package.

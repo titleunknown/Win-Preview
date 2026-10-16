@@ -2,7 +2,7 @@
 
 Planned work, roughly in priority order. [FEATURES.md](FEATURES.md) tracks parity with macOS Preview.
 
-## Next release (v0.3), in the repository now
+## Released in v0.3
 
 - Better crop: adjustable selection with handles, dimmed surroundings, thirds grid and size readout, a floating
   Crop button, an Aspect ratio bar (1:1, 4:5, 2:3, 3:2, 16:9, 9:16 and more, with a portrait/landscape swap), crop all PDF pages, and Reset Crop

@@ -8,7 +8,7 @@ Organized by the chapters of Apple's [Preview User Guide](https://support.apple.
 
 | Preview feature | Status | Notes |
 |---|---|---|
-| Open PDFs and images (multiple at once) | ✅ | Opens PDF, PNG, JPEG, GIF, TIFF, BMP, ICO, HEIC/HEIF, AVIF, WebP, JPEG XR and camera RAW (some formats need Windows codec extensions). Images opened together share one window. Drag and drop is supported. |
+| Open PDFs and images (multiple at once) | ✅ | Opens PDF, PNG, JPEG, GIF, TIFF, BMP, ICO, HEIC/HEIF, AVIF, WebP, JPEG XR and camera RAW (some formats need Windows codec extensions). Images opened together share one window, or open as tabs if you turn tabs on. Drag and drop is supported. |
 | View PDFs and images: zoom, fit, actual size | ✅ | Continuous scroll; zoom with Ctrl+wheel or touchpad pinch (touchscreen pinch not yet); fit to width or page. |
 | Zoom tool / pan | ✅ | **Z** toggles a magnifier tool: double-click jumps between actual size (around the click) and fit. Whenever the page is larger than the window the cursor becomes an open hand and dragging pans. The default Select tool always keeps the standard arrow. |
 | Single page, two pages and contact sheet views | ⬜ | |
