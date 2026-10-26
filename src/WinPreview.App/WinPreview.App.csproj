@@ -18,9 +18,21 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
   </PropertyGroup>
+  <!-- Keep the release download small (GitHub caps files at 100 MB). Partial trimming only trims assemblies that opt in
+       (the .NET runtime and the Windows SDK projection); our own code is kept whole, so reflection over app types
+       (System.Text.Json settings, XAML) keeps working. -->
+  <PropertyGroup>
+    <PublishTrimmed>true</PublishTrimmed>
+    <TrimMode>partial</TrimMode>
+    <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.31.0" />
-    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260921001" />
+    <!-- Only the Windows App SDK components we use, instead of the Microsoft.WindowsAppSDK metapackage, which also
+         pulls in Windows ML (DirectML + a second onnxruntime), Windows AI and Widgets that we never load. -->
+    <PackageReference Include="Microsoft.WindowsAppSDK.WinUI" Version="1.8.260803003" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.DWrite" Version="1.8.25122902" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.9169" />
   </ItemGroup>
   <ItemGroup>

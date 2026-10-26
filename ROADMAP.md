@@ -2,6 +2,11 @@
 
 Planned work, roughly in priority order. [FEATURES.md](FEATURES.md) tracks parity with macOS Preview.
 
+## Released in v0.4
+
+- About half the download size (~55 MB instead of 111 MB): trimmed .NET and Windows SDK, and only the Windows App SDK
+  components the app uses (no Windows ML/DirectML, Windows AI or Widgets)
+
 ## Released in v0.3
 
 - Better crop: adjustable selection with handles, dimmed surroundings, thirds grid and size readout, a floating

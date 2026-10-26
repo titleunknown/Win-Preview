@@ -9,7 +9,7 @@
        across all signed files; releases override Version from the git tag (-p:Version=...). -->
   <PropertyGroup>
     <Product>Win-Preview</Product>
-    <Version Condition="'$(Version)' == ''">0.3.0</Version>
+    <Version Condition="'$(Version)' == ''">0.4.0</Version>
     <Company>Win-Preview contributors</Company>
     <Copyright>Copyright (C) 2026 titleunknown. GPL-3.0-or-later.</Copyright>
     <!-- Keep the commit hash out of the version so SignPath sees one stable product version per release. -->

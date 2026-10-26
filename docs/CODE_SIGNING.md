@@ -35,8 +35,7 @@ From <https://signpath.org/terms>:
 
 The terms say a signed project may not include proprietary components, with an exception for GPL "system libraries".
 Win-Preview's self-contained package bundles Microsoft's Windows App SDK runtime (licensed under Microsoft's own
-terms, not an OSI license), plus the Microsoft Visual C++ runtime DLLs shipped with qpdf and DirectML from ONNX
-Runtime. They are Microsoft-signed redistributables, not our code, but a strict reading could count them.
+terms, not an OSI license), plus the Microsoft Visual C++ runtime DLLs shipped with qpdf. They are Microsoft-signed redistributables, not our code, but a strict reading could count them.
 
 SignPath decides each application by hand. Options if they object:
 
