@@ -1,6 +1,7 @@
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Graphics;
 using Windows.Storage;
@@ -12,9 +13,16 @@ namespace WinPreview;
 
 public sealed partial class MainWindow : Window
 {
-    private DocumentSession? _session;
+    /// <summary>The active tab's document; derived, so it can never disagree with <see cref="_current"/>.</summary>
+    private DocumentSession? _session => _current?.Session;
     private readonly SignatureStore _signatures = new();
-    private bool _closeConfirmed;
+
+    /// <summary>
+    /// Open → Confirming (asking to save each edited document) → Closed, or back to Open if the user cancels.
+    /// A second close request while Confirming is ignored: only one ContentDialog can be open at a time.
+    /// </summary>
+    private enum CloseState { Open, Confirming, Closed }
+    private CloseState _closeState;
     private const double MinWindowWidth = 780, MinWindowHeight = 480;
     /// <summary>Completes once the window content is loaded; dialogs (e.g. the password prompt) need a XamlRoot.</summary>
     private readonly TaskCompletionSource _loaded = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -215,22 +223,42 @@ public sealed partial class MainWindow : Window
 
     private async void OnClosing(AppWindow sender, AppWindowClosingEventArgs args)
     {
-        DocView.CommitInlineEditor();
-        if (_closeConfirmed || !_tabs.Any(t => t.Session.IsDirty)) { Cleanup(); return; }
+        if (_closeState == CloseState.Closed) return;
+        EndTyping();
+        if (!_tabs.Any(t => t.Session.IsDirty))
+        {
+            _closeState = CloseState.Closed;
+            Cleanup();
+            return;
+        }
         args.Cancel = true;
+        // The save prompt can't open over another dialog (e.g. Document Info); the user closes that one first.
+        if (IsDialogOpen()) return;
         await RequestCloseAsync();
     }
 
     /// <summary>Closes the window, first offering to save every document with unsaved changes. (Window.Close() skips AppWindow.Closing.)</summary>
     public async Task RequestCloseAsync()
     {
-        DocView.CommitInlineEditor();
-        foreach (var tab in TabsInOrder())
-            if (!await ConfirmCloseAsync(tab)) return;
-        Cleanup();
-        _closeConfirmed = true;
-        Close();
+        if (_closeState != CloseState.Open) return; // already asking, or already closed
+        _closeState = CloseState.Confirming;
+        try
+        {
+            EndTyping();
+            foreach (var tab in TabsInOrder())
+                if (!await ConfirmCloseAsync(tab)) return;
+            _closeState = CloseState.Closed;
+            Cleanup();
+            Close();
+        }
+        finally
+        {
+            if (_closeState == CloseState.Confirming) _closeState = CloseState.Open; // cancelled or failed
+        }
     }
+
+    private bool IsDialogOpen() =>
+        Root.XamlRoot is { } root && VisualTreeHelper.GetOpenPopupsForXamlRoot(root).Any(p => p.Child is ContentDialog);
 
     // ---------------- Drag & drop ----------------
 

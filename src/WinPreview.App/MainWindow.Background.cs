@@ -31,22 +31,39 @@ public sealed partial class MainWindow
     /// <param name="model">Null picks the best installed model.</param>
     private async Task RemoveBackgroundAsync(SegmentationModel? model)
     {
-        if (_session is not { IsPdf: false } || _removingBackground) return;
+        if (_session is not { IsPdf: false }) return;
+        if (_removingBackground)
+        {
+            ShowInfo("Already removing a background", "Wait for the current one to finish.");
+            return;
+        }
+        EndTyping();
         model ??= BackgroundRemover.IsInstalled(BackgroundRemover.HighQuality) ? BackgroundRemover.HighQuality : BackgroundRemover.Standard;
         if (!BackgroundRemover.IsInstalled(model) && !await DownloadModelAsync(model)) return;
+        if (_session is not { IsPdf: false } session) return;
 
+        // The job belongs to this document, page and content version. Prediction takes seconds, during which the
+        // user may switch tabs, close the tab, or edit the image; the mask is only applied if its target is unchanged.
         int page = DocView.CurrentPage;
-        var frame = _session.Pages[page].Frame!.Clone();
+        int generation = session.ContentGeneration;
+        var frame = session.Pages[page].Frame!.Clone();
         _removingBackground = true;
         ShowInfo("Removing background…", $"Using the {model.Name.ToLowerInvariant()} model.");
         try
         {
             var mask = await BackgroundRemover.PredictMaskAsync(frame, model);
-            if (_session is { IsPdf: false } s && page < s.PageCount)
+            if (!_tabs.Any(t => t.Session == session))
             {
-                s.ApplyAlphaMask(page, mask, model.InputSize);
-                HideInfo();
+                HideInfo(); // its tab was closed (or moved to another window)
+                return;
             }
+            if (page >= session.PageCount || session.ContentGeneration != generation)
+            {
+                ShowInfo("Background not removed", "The image changed while it was being processed. Try again.");
+                return;
+            }
+            session.ApplyAlphaMask(page, mask, model.InputSize);
+            HideInfo();
         }
         catch (Exception ex)
         {

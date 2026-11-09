@@ -140,10 +140,20 @@ public sealed class DocumentSession : IDisposable
     }
 
     // ---------------- Text (PDF text or OCR'd image text) ----------------
+    //
+    // Per image page, OCR moves through: absent (no entry) → recognizing (_ocrTasks) → ready (_textLayers; the
+    // layer, or null when there is no text or recognition failed). Every content change bumps _contentGeneration
+    // and clears both maps; a recognition that finishes for an older generation is discarded.
 
     private readonly Dictionary<int, TextLayer?> _textLayers = [];
     private readonly Dictionary<int, Task<TextLayer?>> _ocrTasks = [];
     private int _contentGeneration;
+
+    /// <summary>
+    /// Changes whenever page content or structure changes (every structural edit, undo and redo; not markup edits).
+    /// Long-running work captures it to check that its result still applies.
+    /// </summary>
+    public int ContentGeneration => _contentGeneration;
 
     /// <summary>Raised when OCR finishes for an image page, making its text selectable.</summary>
     public event Action<int>? TextLayerReady;
@@ -319,23 +329,39 @@ public sealed class DocumentSession : IDisposable
         StructureChanged?.Invoke();
     }
 
-    /// <summary>Runs a structural edit with whole-document snapshot undo.</summary>
+    /// <summary>
+    /// Runs a structural edit with whole-document snapshot undo. It is all-or-nothing: if anything fails after the
+    /// edit has started (it may have changed some pages but not others), the document is restored to the snapshot
+    /// taken before it, so the pages, the PDF and the view never disagree, and the error is rethrown.
+    /// </summary>
     private void Structural(string name, Action edit)
     {
+        bool wasDirty = IsDirty;
+        Snapshot? before = null;
         try
         {
-            var before = TakeSnapshot();
+            var snapshot = before = TakeSnapshot();
             edit();
             ResetGeometry();
             var after = TakeSnapshot();
             MarkDirty();
             StructureChanged?.Invoke();
-            Undo.Push(name, () => Restore(before), () => Restore(after));
+            Undo.Push(name, () => Restore(snapshot), () => Restore(after));
             Log.Write($"structural '{name}' ok, pages={Pages.Count}");
         }
         catch (Exception ex)
         {
             Log.Write($"structural '{name}' FAILED: {ex}");
+            if (before != null)
+            {
+                try
+                {
+                    Restore(before);
+                    if (!wasDirty) MarkClean();
+                    Log.Write($"structural '{name}' rolled back");
+                }
+                catch (Exception rollback) { Log.Write($"structural '{name}' rollback FAILED: {rollback}"); }
+            }
             throw;
         }
     }

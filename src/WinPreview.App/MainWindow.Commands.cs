@@ -98,9 +98,9 @@ public sealed partial class MainWindow
     {
         bool pdf = _session?.IsPdf == true;
         string noun = pdf ? (pages.Count > 1 ? "Pages" : "Page") : (pages.Count > 1 ? "Images" : "Image");
-        menu.Items.Add(DocumentView.Item("Rotate Left", "", () => _session?.RotatePages(pages, clockwise: false)));
-        menu.Items.Add(DocumentView.Item("Rotate Right", "", () => _session?.RotatePages(pages, clockwise: true)));
-        if (pdf) menu.Items.Add(DocumentView.Item("Insert Blank Page", "", () => _session?.InsertBlankPage(pages.Max() + 1)));
+        menu.Items.Add(DocumentView.Item("Rotate Left", "", () => { EndTyping(); _session?.RotatePages(pages, clockwise: false); }));
+        menu.Items.Add(DocumentView.Item("Rotate Right", "", () => { EndTyping(); _session?.RotatePages(pages, clockwise: true); }));
+        if (pdf) menu.Items.Add(DocumentView.Item("Insert Blank Page", "", () => { EndTyping(); _session?.InsertBlankPage(pages.Max() + 1); }));
         menu.Items.Add(DocumentView.Item($"Insert from File…", "", () => _ = InsertFromFileAsync(pages.Max() + 1)));
         var del = DocumentView.Item($"Delete {noun}", "", DeletePages);
         del.IsEnabled = _session != null && pages.Count < _session.PageCount;
@@ -142,9 +142,21 @@ public sealed partial class MainWindow
         if (!show) DocView.Tool = Tool.Select;
     }
 
+    /// <summary>
+    /// Leaves "typing mode" (an inline text box being edited, or a focused PDF form field) so pending text is
+    /// written to the document. Every command that reads the document for output or changes it calls this first,
+    /// so the command sees, and its undo step follows, what the user typed.
+    /// </summary>
+    private void EndTyping()
+    {
+        DocView.CommitInlineEditor();
+        DocView.KillFormFocus();
+    }
+
     private void RotateCurrent(bool clockwise)
     {
         if (_session == null) return;
+        EndTyping();
         var pages = ThumbList.SelectedItems.Count > 1 ? SelectedPages() : [DocView.CurrentPage];
         _session.RotatePages(pages, clockwise);
     }
@@ -152,6 +164,7 @@ public sealed partial class MainWindow
     private void DeletePages()
     {
         if (_session == null) return;
+        EndTyping();
         var pages = SelectedPages();
         if (pages.Count >= _session.PageCount)
         {
@@ -163,16 +176,21 @@ public sealed partial class MainWindow
 
     private void Undo()
     {
-        DocView.CommitInlineEditor();
+        EndTyping();
         _session?.Undo.Undo();
     }
 
-    private void Redo() => _session?.Undo.Redo();
+    private void Redo()
+    {
+        EndTyping();
+        _session?.Undo.Redo();
+    }
 
     /// <param name="allPages">PDFs only: crop every page to the same visible area.</param>
     private void Crop(bool allPages = false)
     {
         if (_session == null || DocView.RectSelection is not { } sel) return;
+        EndTyping();
         if (_session.IsPdf)
             _session.CropPdfPages(allPages ? Enumerable.Range(0, _session.PageCount).ToList() : [sel.Page], sel.Page, sel.Rect);
         else _session.CropImage(sel.Page, sel.Rect);
@@ -190,6 +208,7 @@ public sealed partial class MainWindow
     private void ResetCrop(bool allPages)
     {
         if (_session is not { IsPdf: true } s) return;
+        EndTyping();
         s.ResetCrop(allPages ? Enumerable.Range(0, s.PageCount).ToList() : SelectedPages());
     }
 
@@ -296,6 +315,7 @@ public sealed partial class MainWindow
         InitPicker(picker);
         var file = await picker.PickSingleFileAsync();
         if (file == null) return;
+        EndTyping();
         try { await _session.InsertFileAsync(file.Path, Math.Min(at, _session.PageCount)); }
         catch (Exception ex) { ShowError("Couldn't insert the file", ex.Message); }
     }
@@ -304,8 +324,7 @@ public sealed partial class MainWindow
     private async Task<bool> SaveAsync()
     {
         if (_session == null) return false;
-        DocView.CommitInlineEditor();
-        DocView.KillFormFocus();
+        EndTyping();
         if (!_session.CanSaveInPlace) return await SaveAsAsync();
 
         // Like Preview: offer PNG when transparency would be lost (e.g. after removing a JPEG's background).
@@ -364,7 +383,7 @@ public sealed partial class MainWindow
     private async Task<bool> SaveAsAsync()
     {
         if (_session == null) return false;
-        DocView.CommitInlineEditor();
+        EndTyping();
         var path = await PickSavePathAsync(_session.IsPdf ? "PDF" : (_session.FilePath is { } p && ImageCodec.FormatForExtension(Path.GetExtension(p)) is { } f ? f.Name : "PNG"));
         if (path == null) return false;
         try
@@ -399,7 +418,7 @@ public sealed partial class MainWindow
     private async Task ExportAsync()
     {
         if (_session == null) return;
-        DocView.CommitInlineEditor();
+        EndTyping();
         var formats = new List<string> { "PDF" };
         formats.AddRange(ImageCodec.SaveFormats.Select(f => f.Name));
         var formatBox = new ComboBox { Header = "Format", ItemsSource = formats, SelectedIndex = _session.IsPdf ? Math.Max(0, formats.IndexOf("PNG")) : 0, HorizontalAlignment = HorizontalAlignment.Stretch };
@@ -572,8 +591,7 @@ public sealed partial class MainWindow
     private async Task PrintAsync()
     {
         if (_session == null) return;
-        DocView.CommitInlineEditor();
-        DocView.KillFormFocus();
+        EndTyping();
         Log.Write("print requested");
         try { await Printing.PrintAsync(Hwnd, _session); }
         catch (Exception ex)
@@ -588,7 +606,7 @@ public sealed partial class MainWindow
     private void StartSlideshow()
     {
         if (_session == null) return;
-        DocView.CommitInlineEditor();
+        EndTyping();
         new SlideshowWindow(_session, DocView.CurrentPage).Activate();
     }
 
@@ -604,7 +622,7 @@ public sealed partial class MainWindow
     private async Task ShareAsync()
     {
         if (_session == null) return;
-        DocView.CommitInlineEditor();
+        EndTyping();
         try
         {
             // Share what's on screen, including unsaved markups.

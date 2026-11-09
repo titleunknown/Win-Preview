@@ -87,8 +87,7 @@ public sealed partial class MainWindow
     private void DetachCurrent()
     {
         if (_current == null) return;
-        DocView.CommitInlineEditor();
-        DocView.KillFormFocus();
+        EndTyping();
         _current.View = DocView.CaptureState();
         _current.SidebarVisible = _sidebarVisible;
         HookSession(_current.Session, false);
@@ -96,7 +95,6 @@ public sealed partial class MainWindow
         _searchCts?.Cancel();
         DocView.Detach();
         _current = null;
-        _session = null;
     }
 
     private void ActivateTab(DocTab tab)
@@ -104,7 +102,6 @@ public sealed partial class MainWindow
         if (_current == tab) return;
         DetachCurrent();
         _current = tab;
-        _session = tab.Session;
         HookSession(tab.Session, true);
         ClearSearch();
         DocView.Tool = Tool.Select;
@@ -158,7 +155,7 @@ public sealed partial class MainWindow
     /// <summary>Asks whether to save a document with unsaved changes. False means the user cancelled.</summary>
     private async Task<bool> ConfirmCloseAsync(DocTab tab)
     {
-        if (tab == _current) DocView.CommitInlineEditor();
+        if (tab == _current) EndTyping();
         if (!tab.Session.IsDirty) return true;
         // Show the tab being asked about, and make it the target of Save.
         ActivateTab(tab);
@@ -200,7 +197,7 @@ public sealed partial class MainWindow
     private void MoveToNewWindow(DocTab tab)
     {
         if (_tabs.Count < 2) return;
-        DocView.CommitInlineEditor();
+        EndTyping();
         var session = tab.Session;
         RemoveTab(tab, dispose: false);
         App.Current.OpenWindowWithSession(session);

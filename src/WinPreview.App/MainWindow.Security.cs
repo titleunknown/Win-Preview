@@ -18,7 +18,7 @@ public sealed partial class MainWindow
             ShowError("Password protection isn't available", "The bundled qpdf tool is missing. Reinstall Win-Preview.");
             return;
         }
-        DocView.CommitInlineEditor();
+        EndTyping();
         var result = await PasswordDialog.ShowAsync(Root.XamlRoot, session.Encryption);
         if (result == null) return;
         session.SetEncryption(result.Remove ? null : result.Encryption);
@@ -43,8 +43,7 @@ public sealed partial class MainWindow
             ShowError("Reduce File Size isn't available", "The bundled qpdf tool is missing. Reinstall Win-Preview.");
             return;
         }
-        DocView.CommitInlineEditor();
-        DocView.KillFormFocus();
+        EndTyping();
 
         var choices = new RadioButtons { SelectedIndex = 0, MaxColumns = 1 };
         foreach (var (_, title, detail) in CompressionChoices)

@@ -18,9 +18,15 @@ public sealed partial class DocumentView
 {
     private enum DragKind { None, TextSelect, Move, Resize, Ink, Shape, RectSelect, Form, Alpha, CropMove, CropResize, Pan }
 
+    // One pointer drag at a time: _drag says which kind (None = idle); the _drag* fields below are its data and are
+    // only meaningful while _drag != None. See EndDrag for what each kind does when it ends.
     private DragKind _drag;
     private int _dragPage, _dragHandle, _textAnchor = -1, _formPage = -1;
+    /// <summary>The tool the drag started with. The drag uses this, not <see cref="Tool"/>, which can change mid-drag.</summary>
+    private Tool _dragTool;
     private Point _dragStartDip;
+    /// <summary>Where the pointer last was (past the drag threshold); used when the drag ends without a release point.</summary>
+    private Point _dragLastDip;
     private PointD _dragLastUser;
     private MarkupItem? _dragBefore;
     private bool _dragMoved;
@@ -77,7 +83,7 @@ public sealed partial class DocumentView
         var pdf = _session.Pdf;
         Log.Write($"press page={page} dip={dip} user={user} tool={Tool}");
         _dragPage = page;
-        _dragStartDip = dip;
+        _dragStartDip = _dragLastDip = dip;
         _dragLastUser = user;
         _dragMoved = false;
         e.Handled = true;
@@ -196,6 +202,7 @@ public sealed partial class DocumentView
     private void BeginDrag(PageView pv, PointerRoutedEventArgs e, DragKind kind, MarkupItem? before = null, int handle = -1)
     {
         _drag = kind;
+        _dragTool = Tool;
         _dragBefore = before;
         _dragHandle = handle;
         pv.CapturePointer(e.Pointer);
@@ -224,6 +231,7 @@ public sealed partial class DocumentView
         var user = map.ToUser(dip);
         if (!_dragMoved && Math.Abs(raw.X - _dragStartDip.X) + Math.Abs(raw.Y - _dragStartDip.Y) < 3) return;
         _dragMoved = true;
+        _dragLastDip = dip;
         var pdf = _session.Pdf;
         Log.Write($"move drag={_drag} dip={dip} anchor={_textAnchor}");
 
@@ -289,6 +297,14 @@ public sealed partial class DocumentView
         e.Handled = true;
     }
 
+    /// <summary>
+    /// Finishes a drag. <paramref name="releaseDip"/> is null when pointer capture was lost (e.g. alt-tab) rather than
+    /// released; the drag then ends at the last point the pointer reached. What each kind does:
+    /// TextSelect keeps the selection (and highlights it with the Highlight tool); Move/Resize record an undo step;
+    /// Ink and Shape add the markup; RectSelect keeps the crop rectangle; Form sends mouse-up to the field;
+    /// Alpha applies only on a real release; CropMove/CropResize/Pan have already applied as they moved.
+    /// To abandon a drag without any of this, use <see cref="CancelDrag"/>.
+    /// </summary>
     private void EndDrag(Point? releaseDip)
     {
         var kind = _drag;
@@ -298,12 +314,12 @@ public sealed partial class DocumentView
         if (_session == null || _dragPage >= _pages.Count) return;
         var pv = _pages[_dragPage];
         var map = pv.Mapping;
-        var dip = releaseDip.HasValue ? pv.Clamp(releaseDip.Value) : _dragStartDip;
+        var dip = pv.Clamp(releaseDip ?? _dragLastDip);
 
         switch (kind)
         {
             case DragKind.TextSelect:
-                if (Tool == Tool.Highlight && _textSel != null) MarkUpSelectedText(CurrentStyle.MarkupStyle);
+                if (_dragTool == Tool.Highlight && _textSel != null) MarkUpSelectedText(CurrentStyle.MarkupStyle);
                 else if (!_dragMoved) ClearTextSelection();
                 break;
             case DragKind.Move or DragKind.Resize when _dragBefore != null:
@@ -340,6 +356,28 @@ public sealed partial class DocumentView
         SetLivePreview(pv, null);
     }
 
+    /// <summary>
+    /// Abandons the current drag without committing anything: used when the pages are about to be rebuilt (undo,
+    /// rotate, …) or the document is detached, where finishing the drag would act on stale pages or record a bogus
+    /// undo step that wipes the redo history.
+    /// </summary>
+    private void CancelDrag()
+    {
+        if (_drag == DragKind.None) return;
+        var kind = _drag;
+        _drag = DragKind.None; // first, so the capture-lost event raised below is ignored
+        Log.Write($"cancel drag={kind}");
+        if (kind == DragKind.Alpha) EndInstantAlpha(apply: false);
+        _liveStroke = null;
+        _dragBefore = null;
+        if (_dragPage < _pages.Count)
+        {
+            var pv = _pages[_dragPage];
+            SetLivePreview(pv, null);
+            pv.ReleasePointerCaptures();
+        }
+    }
+
     /// <summary>Drops points closer than <paramref name="minDist"/> to the previous kept point.</summary>
     private static List<PointD> Simplify(List<PointD> pts, double minDist)
     {
@@ -354,7 +392,7 @@ public sealed partial class DocumentView
     {
         bool tiny = Math.Abs(a.X - b.X) < 4 && Math.Abs(a.Y - b.Y) < 4;
         double width = CurrentStyle.StrokeWidth * StyleScale(_dragPage);
-        if (Tool is Tool.Line or Tool.Arrow)
+        if (_dragTool is Tool.Line or Tool.Arrow)
         {
             if (tiny) b = new Point(a.X + 120, a.Y);
             else if (constrain)
@@ -366,7 +404,7 @@ public sealed partial class DocumentView
             }
             return new LineMarkup
             {
-                Start = map.ToUser(a), End = map.ToUser(b), ArrowAtEnd = Tool == Tool.Arrow, Color = CurrentStyle.Stroke, StrokeWidth = width,
+                Start = map.ToUser(a), End = map.ToUser(b), ArrowAtEnd = _dragTool == Tool.Arrow, Color = CurrentStyle.Stroke, StrokeWidth = width,
             };
         }
         if (tiny) b = new Point(a.X + 120, a.Y + 80);
@@ -377,7 +415,7 @@ public sealed partial class DocumentView
         }
         return new ShapeMarkup
         {
-            Shape = Tool == Tool.Oval ? ShapeKind.Oval : ShapeKind.Rectangle,
+            Shape = _dragTool == Tool.Oval ? ShapeKind.Oval : ShapeKind.Rectangle,
             Rect = map.ToUser(new Rect(a, b)), Color = CurrentStyle.Stroke, StrokeWidth = width, Fill = CurrentStyle.Fill,
         };
     }

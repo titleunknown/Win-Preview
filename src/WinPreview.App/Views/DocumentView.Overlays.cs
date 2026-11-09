@@ -24,6 +24,15 @@ public sealed partial class DocumentView
     private static readonly SolidColorBrush CurrentHitBrush = new(Windows.UI.Color.FromArgb(150, 255, 149, 0));
     private static readonly SolidColorBrush AccentBrush = new(Windows.UI.Color.FromArgb(255, 0, 120, 215));
 
+    // What the user has selected or is typing into. These five are related; the rules for which can coexist:
+    //
+    //   _selected  (a markup)         ⟂ _textSel                  — selecting one clears the other
+    //   _formPage  (PDF form focus)   ⟂ _selected, _editing       — selecting a markup or editing a text box kills form focus
+    //   _editing   (inline text box)  wins the keyboard while open; committing it may select the new text box
+    //   _rectSel   (crop rectangle)   may coexist with _selected (on images, cropping is editable in the Select tool);
+    //                                 it is cleared when the tool changes away from RectSelect
+    //
+    // Keyboard routing in OnPreviewKeyDown follows the same priority: _editing, then _formPage, then the rest.
     private (int Page, Guid Id)? _selected;
     private TextSelection? _textSel;
     private (int Page, RectD Rect)? _rectSel;
@@ -65,6 +74,8 @@ public sealed partial class DocumentView
 
     public void SelectMarkup(int page, Guid id)
     {
+        // A focused form field would otherwise keep the keyboard, so Delete and the arrows wouldn't reach the markup.
+        KillFormFocus();
         ClearTextSelection();
         _selected = (page, id);
         RedrawAdorners();
@@ -233,6 +244,7 @@ public sealed partial class DocumentView
     private void BeginTextEdit(int page, TextBoxMarkup draft, bool isNew)
     {
         CommitInlineEditor();
+        KillFormFocus();
         var pv = _pages[page];
         var map = pv.Mapping;
         var r = map.ToDip(draft.Rect);

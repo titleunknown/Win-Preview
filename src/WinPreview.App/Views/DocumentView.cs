@@ -127,6 +127,7 @@ public sealed partial class DocumentView : Grid
         session.StructureChanged += OnStructureChanged;
         session.PageContentChanged += OnPageContentChanged;
         session.MarkupsChanged += OnMarkupsChanged;
+        session.TextLayerReady += OnTextLayerReady;
         Fit = session.IsPdf ? FitMode.Width : FitMode.Page;
         RebuildPages();
     }
@@ -134,9 +135,11 @@ public sealed partial class DocumentView : Grid
     public void Detach()
     {
         if (_session == null) return;
+        CancelDrag();
         _session.StructureChanged -= OnStructureChanged;
         _session.PageContentChanged -= OnPageContentChanged;
         _session.MarkupsChanged -= OnMarkupsChanged;
+        _session.TextLayerReady -= OnTextLayerReady;
         _session = null;
         _pages.Clear();
         _stack.Children.Clear();
@@ -144,12 +147,19 @@ public sealed partial class DocumentView : Grid
 
     private void OnStructureChanged() => _dispatcher.TryEnqueue(() =>
     {
+        CancelDrag(); // the pages it was dragging on are about to be replaced
         _selected = null;
         _textSel = null;
         _rectSel = null;
         _formPage = -1;
         RebuildPages();
         SelectionChanged?.Invoke();
+    });
+
+    /// <summary>OCR finished for an image page: if the pointer is resting on it, show the text cursor without waiting for a move.</summary>
+    private void OnTextLayerReady(int page) => _dispatcher.TryEnqueue(() =>
+    {
+        if (_hoverPage?.Index == page) RefreshHoverCursor();
     });
 
     private void OnPageContentChanged(int page) => _dispatcher.TryEnqueue(() =>
