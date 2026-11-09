@@ -2,6 +2,13 @@
 
 Planned work, roughly in priority order. [FEATURES.md](FEATURES.md) tracks parity with macOS Preview.
 
+## Released in v0.5
+
+- Reliability fixes: Remove Background only changes the image it started on; closing the window with unsaved changes
+  no longer fails when clicked twice or over another dialog; a page edit that fails part-way is fully undone; typed
+  text and form entries are committed before page commands, exports and sharing; shape drags keep the shape they
+  started with
+
 ## Released in v0.4
 
 - About half the download size (~55 MB instead of 111 MB): trimmed .NET and Windows SDK, and only the Windows App SDK
