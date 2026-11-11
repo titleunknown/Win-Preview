@@ -22,7 +22,7 @@ public sealed class ToolStyle
     public double StrokeWidth { get; set; } = 2;
     public RgbaColor TextColor { get; set; } = RgbaColor.Black;
     public double FontSize { get; set; } = 14;
-    public PdfStandardFont Font { get; set; } = PdfStandardFont.Helvetica;
+    public string Font { get; set; } = TextFonts.Helvetica;
     public TextMarkupStyle MarkupStyle { get; set; } = TextMarkupStyle.Highlight;
     public RgbaColor HighlightColor { get; set; } = RgbaColor.HighlightYellow;
 }
@@ -250,6 +250,9 @@ public sealed partial class DocumentView : Grid
     private void SetZoomCore(double zoom, Point? anchor)
     {
         if (Math.Abs(zoom - Zoom) < 1e-4 && _pages.All(p => Math.Abs(p.Zoom - zoom) < 1e-6)) return;
+        // The inline text editor is laid out at the old zoom and would be left stranded (and its old-zoom size
+        // mistaken for new-zoom DIPs when it commits), so finish the edit first, as rotating does.
+        CommitInlineEditor();
         var a = anchor ?? new Point(_scroll.ViewportWidth / 2, _scroll.ViewportHeight / 2);
         double contentX = _scroll.HorizontalOffset + a.X - PagePadding, contentY = _scroll.VerticalOffset + a.Y - PagePadding;
         double ratio = zoom / Zoom;

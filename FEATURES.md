@@ -39,7 +39,7 @@ Organized by the chapters of Apple's [Preview User Guide](https://support.apple.
 | Shapes: rectangle, oval, line, arrow | ✅ | Shift constrains. Border color, fill color and line width. |
 | Star, polygon, speech bubble, loupe, mask | ⬜ | |
 | Sketch (shape recognition) and Draw | 🟡 | Freehand Draw is done; Sketch's shape recognition isn't. |
-| Text boxes | ✅ | Grows as you type. Helvetica, Times or Courier, with size and color. |
+| Text boxes | ✅ | Grows as you type. Any installed font (embedded in the saved PDF) or the PDF standard Helvetica, Times and Courier, with size and color. The font list has a search field and shows each name in its own font. |
 | Combine PDFs | ✅ | Insert from file, or drop files on the thumbnails. |
 | Add, delete, move and rotate pages | ✅ | Add Page and Remove buttons under the thumbnails (blank page or pages from a file), plus drag to reorder. All undoable. |
 | Crop PDF pages | ✅ | Press **C** or click the Crop button (or use the rectangular selection tool) and drag over the area to keep. Adjust with the handles or move it; the rest is dimmed, with a size readout. Crop one page or **All pages** from the floating button (Enter also works). Non-destructive: **Reset Crop** in the More menu restores the full page. Works on rotated pages. |
@@ -79,7 +79,8 @@ Organized by the chapters of Apple's [Preview User Guide](https://support.apple.
 
 ## Known limitations
 
-- Text boxes on rotated PDF pages display upright on screen, but are saved in unrotated page space.
-- Text box text is saved with the PDF standard fonts, which only cover Latin-1 characters. Embedded Unicode fonts are planned.
+- Helvetica, Times and Courier only cover Latin-1 characters; choose an installed font for other languages.
+- Installed fonts are embedded whole, not subset, so each one adds its full file size (about 1 MB for most Latin
+  fonts, far more for CJK fonts) to the saved PDF. Only TrueType-outline fonts whose license allows embedding are listed.
 - PDF thumbnails show page content without the markup overlay.
 - The whole of a large print job is rendered up front, at 150 DPI.

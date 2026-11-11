@@ -248,9 +248,11 @@ public sealed partial class DocumentView
         var pv = _pages[page];
         var map = pv.Mapping;
         var r = map.ToDip(draft.Rect);
+        // Text is set after the initializer: a TextBox keeps only the first line of text it's given while
+        // AcceptsReturn is still false, and initializers assign in order.
         var box = new TextBox
         {
-            Text = draft.Text, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap,
+            AcceptsReturn = true, TextWrapping = TextWrapping.Wrap,
             FontFamily = MarkupVisuals.FontFor(draft.Font), FontSize = Math.Max(4, draft.FontSize * map.Scale),
             Foreground = draft.Color.Brush(),
             // Clear unless the user chose a fill, so the page shows through while typing (as it will once saved).
@@ -259,6 +261,8 @@ public sealed partial class DocumentView
             Padding = new Thickness(2 * map.Scale), MinWidth = 20, MinHeight = 0, Width = Math.Max(30, r.Width),
             CornerRadius = new CornerRadius(0),
         };
+        box.Text = draft.Text;
+        Log.Write($"edit text page={page} new={isNew} lines={draft.Text.Split('\n').Length} kept={box.Text.Split('\r', '\n').Length} rect={r}");
         // WinUI paints its own fills on hover/focus; keep every state matching the box.
         foreach (var state in new[] { "", "PointerOver", "Focused", "Disabled" })
         {
@@ -268,8 +272,10 @@ public sealed partial class DocumentView
         }
         box.Resources["TextControlBorderThemeThicknessFocused"] = new Thickness(1);
 
-        // Like Preview, the box widens as you type until it reaches the page edge, then wraps.
-        double minWidth = box.Width, maxWidth = Math.Max(minWidth, pv.Width - r.X - 4);
+        // Like Preview, a new box widens as you type until it reaches the page edge, then wraps. An existing box keeps
+        // its width (it may have been resized narrower on purpose) and wraps inside it; otherwise re-editing would
+        // measure its long wrapped lines unwrapped and snap the box out to the page edge.
+        double minWidth = box.Width, maxWidth = isNew ? Math.Max(minWidth, pv.Width - r.X - 4) : minWidth;
         var measurer = new TextBlock { FontFamily = box.FontFamily, FontSize = box.FontSize };
         void Fit()
         {
@@ -318,14 +324,19 @@ public sealed partial class DocumentView
         double heightDip = ed.Box.ActualHeight, widthDip = ed.Box.ActualWidth;
         pv?.AdornerLayer.Children.Remove(ed.Box);
 
-        // Text boxes grow downward (in display space) to fit their text.
+        // Text boxes grow downward (in display space) to fit their text. The height comes from laying the text out
+        // exactly as the saved box will draw it, not just from the editor's size, which can differ (line height, wrap
+        // width) and left later lines clipped.
         var rect = ed.Draft.Rect;
         if (pv != null)
         {
             var map = pv.Mapping;
             var r = map.ToDip(rect);
-            if (heightDip > r.Height || widthDip > r.Width)
-                rect = map.ToUser(new Rect(r.X, r.Y, Math.Max(r.Width, widthDip), Math.Max(r.Height, heightDip)));
+            double w = Math.Max(r.Width, widthDip);
+            double h = Math.Max(Math.Max(r.Height, heightDip), MarkupVisuals.TextBoxHeightDip(ed.Draft, text, map, w));
+            if (h > r.Height + 0.5 || w > r.Width + 0.5)
+                rect = map.ToUser(new Rect(r.X, r.Y, w, h));
+            Log.Write($"commit text new={ed.IsNew} lines={text.Split('\n').Length} editor={widthDip:0}x{heightDip:0} box={r.Width:0}x{r.Height:0} -> {w:0}x{h:0}");
         }
 
         if (ed.IsNew)
@@ -360,9 +371,10 @@ public sealed partial class DocumentView
         var anchor = pv.MarkupLayer.Children.OfType<FrameworkElement>().FirstOrDefault(e => e.Tag is Guid g && g == note.Id);
         var box = new TextBox
         {
-            Text = note.Text, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, Width = 240, Height = 140,
+            AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, Width = 240, Height = 140,
             PlaceholderText = "Type a note", Background = note.Color.Brush(0.25),
         };
+        box.Text = note.Text; // after AcceptsReturn, or all but the first line is dropped
         var flyout = new Flyout { Content = box, Placement = FlyoutPlacementMode.RightEdgeAlignedTop };
         flyout.Opened += (_, _) => box.Focus(FocusState.Programmatic);
         flyout.Closed += (_, _) =>

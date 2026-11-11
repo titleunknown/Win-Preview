@@ -43,13 +43,16 @@ public readonly record struct PageMapping(Affine UserToDisplay, double Scale)
 /// <summary>Builds XAML visuals for markups. Each visual is tagged with the markup's Id.</summary>
 public static class MarkupVisuals
 {
-    public static FontFamily FontFor(PdfStandardFont f) => f switch
+    public static FontFamily FontFor(string font) => new(font switch
     {
         // Metric-compatible stand-ins for the PDF base-14 fonts, so wrapping matches the saved file.
-        PdfStandardFont.TimesRoman => new FontFamily("Times New Roman"),
-        PdfStandardFont.Courier => new FontFamily("Courier New"),
-        _ => new FontFamily("Arial"),
-    };
+        TextFonts.Helvetica => "Arial",
+        TextFonts.Times => "Times New Roman",
+        TextFonts.Courier => "Courier New",
+        // An installed font. One that isn't installed here (the file came from another PC) is saved in Helvetica,
+        // so show it in Arial rather than whatever XAML would substitute.
+        _ => SystemFonts.Find(font) != null ? font : "Arial",
+    });
 
     public static FrameworkElement Create(MarkupItem item, PageMapping map)
     {
@@ -140,18 +143,36 @@ public static class MarkupVisuals
         {
             Width = r.Width, Height = r.Height,
             Background = t.Fill is { } f ? f.Brush() : null,
-            Padding = new Thickness(2 * map.Scale),
-            Child = new TextBlock
-            {
-                Text = t.Text, TextWrapping = TextWrapping.Wrap, FontFamily = FontFor(t.Font),
-                FontSize = Math.Max(1, t.FontSize * map.Scale), Foreground = t.Color.Brush(),
-                LineHeight = t.FontSize * 1.2 * map.Scale, LineStackingStrategy = LineStackingStrategy.BlockLineHeight,
-                TextLineBounds = TextLineBounds.Full,
-            },
+            Padding = new Thickness(TextBoxPadding(map)),
+            Child = TextBoxText(t, t.Text, map),
         };
         Canvas.SetLeft(border, r.X);
         Canvas.SetTop(border, r.Y);
         return border;
+    }
+
+    private static double TextBoxPadding(PageMapping map) => 2 * map.Scale;
+
+    private static TextBlock TextBoxText(TextBoxMarkup t, string text, PageMapping map) => new()
+    {
+        Text = text, TextWrapping = TextWrapping.Wrap, FontFamily = FontFor(t.Font),
+        FontSize = Math.Max(1, t.FontSize * map.Scale), Foreground = t.Color.Brush(),
+        LineHeight = t.FontSize * 1.2 * map.Scale, LineStackingStrategy = LineStackingStrategy.BlockLineHeight,
+        TextLineBounds = TextLineBounds.Full,
+    };
+
+    /// <summary>
+    /// Height in DIPs that <paramref name="text"/> needs when a text box of <paramref name="widthDip"/> is drawn
+    /// by <see cref="Create"/>, padding included. A box shorter than this clips its lower lines.
+    /// </summary>
+    public static double TextBoxHeightDip(TextBoxMarkup t, string text, PageMapping map, double widthDip)
+    {
+        double pad = TextBoxPadding(map);
+        var block = TextBoxText(t, text, map);
+        block.Measure(new Size(Math.Max(1, widthDip - 2 * pad), double.PositiveInfinity));
+        // A trailing newline still occupies a line in the editor, but TextBlock doesn't count it.
+        int trailing = text.Length - text.TrimEnd('\n', '\r').Length;
+        return block.DesiredSize.Height + (trailing > 0 ? block.LineHeight : 0) + 2 * pad;
     }
 
     private static FrameworkElement Note(NoteMarkup n, PageMapping map)

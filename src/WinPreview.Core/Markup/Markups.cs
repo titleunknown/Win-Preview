@@ -118,14 +118,32 @@ public sealed class LineMarkup : MarkupItem
     }
 }
 
-public enum PdfStandardFont { Helvetica, TimesRoman, Courier }
+/// <summary>
+/// Text box fonts are names. The three standard ones are the PDF base-14 fonts, which every viewer has, so a saved PDF
+/// needn't carry them; any other name is an installed font (see <see cref="SystemFonts"/>) that gets embedded.
+/// </summary>
+public static class TextFonts
+{
+    public const string Helvetica = "Helvetica", Times = "Times", Courier = "Courier";
+
+    public static IReadOnlyList<string> Standard { get; } = [Helvetica, Times, Courier];
+
+    /// <summary>The PDF base-14 font name for a standard font, or null for an installed one.</summary>
+    public static string? Base14Name(string font) => font switch
+    {
+        Helvetica => "Helvetica",
+        Times => "Times-Roman",
+        Courier => "Courier",
+        _ => null,
+    };
+}
 
 public sealed class TextBoxMarkup : MarkupItem
 {
     public RectD Rect { get; set; }
     public string Text { get; set; } = "";
     public double FontSize { get; set; } = 14;
-    public PdfStandardFont Font { get; set; } = PdfStandardFont.Helvetica;
+    public string Font { get; set; } = TextFonts.Helvetica;
     public RgbaColor? Fill { get; set; }
 
     public TextBoxMarkup() => Color = RgbaColor.Black;

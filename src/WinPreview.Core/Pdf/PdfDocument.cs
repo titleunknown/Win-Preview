@@ -101,6 +101,30 @@ public sealed unsafe class PdfDocument : IDisposable
 
     internal nint Handle => _doc;
 
+    // Installed fonts embedded for text boxes, by family, so every text box in the same font shares one embedded
+    // copy. Only the throwaway copies made by Save embed fonts (see there).
+    private readonly Dictionary<string, nint> _embeddedFonts = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// A PDFium font handle for an installed font, embedding it on first use; 0 if the font isn't installed or
+    /// can't be embedded. Call under <see cref="Pdfium.Lock"/>.
+    /// </summary>
+    internal nint GetEmbeddedFont(string family)
+    {
+        if (_embeddedFonts.TryGetValue(family, out var font)) return font;
+        if (Markup.SystemFonts.Find(family) is { } face)
+        {
+            try
+            {
+                var data = Markup.SystemFonts.LoadData(face);
+                fixed (byte* p = data) font = FPDFText_LoadFont(_doc, p, (uint)data.Length, FPDF_FONT_TRUETYPE, 1);
+            }
+            catch (IOException) { font = 0; }
+        }
+        _embeddedFonts[family] = font;
+        return font;
+    }
+
     public int PageCount { get { lock (Pdfium.Lock) return FPDF_GetPageCount(_doc); } }
 
     internal nint GetPage(int index)
@@ -490,6 +514,24 @@ public sealed unsafe class PdfDocument : IDisposable
     /// </summary>
     public void Save(Stream output, IReadOnlyDictionary<int, IReadOnlyList<Markup.MarkupItem>>? markups = null, bool removeSecurity = true)
     {
+        // PDFium writes every object a document has ever created, referenced or not, so a font embedded into this
+        // document would stay in every later save (and undo snapshot) even after its text box is gone. Text boxes in
+        // installed fonts are therefore written into a throwaway copy, which takes the fonts with it.
+        bool embedsFonts = markups != null && markups.Values.Any(items =>
+            items.Any(m => m is Markup.TextBoxMarkup t && Markup.TextFonts.Base14Name(t.Font) == null));
+        if (!embedsFonts)
+        {
+            SaveCore(output, markups, removeSecurity);
+            return;
+        }
+        using var plain = new MemoryStream();
+        SaveCore(plain, null, removeSecurity);
+        using var copy = Open(plain.ToArray());
+        copy.SaveCore(output, markups, removeSecurity: true);
+    }
+
+    private void SaveCore(Stream output, IReadOnlyDictionary<int, IReadOnlyList<Markup.MarkupItem>>? markups, bool removeSecurity)
+    {
         lock (Pdfium.Lock)
         {
             if (_form != 0) FORM_ForceToKillFocus(_form);
@@ -662,6 +704,8 @@ public sealed unsafe class PdfDocument : IDisposable
         {
             if (_doc == 0) return;
             ClosePages();
+            foreach (var font in _embeddedFonts.Values) if (font != 0) FPDFFont_Close(font);
+            _embeddedFonts.Clear();
             if (_form != 0) FPDFDOC_ExitFormFillEnvironment(_form);
             _form = 0;
             if (_formInfo != null)

@@ -134,6 +134,7 @@ public sealed partial class MainWindow
         _textSwatch = new TextBlock { Text = "Aa", FontSize = 14, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
         _textButton = StyleDropDown(_textSwatch, "Text style");
         _textButton.Flyout = BuildTextFlyout();
+        _ = Task.Run(() => SystemFonts.Families); // scan installed fonts now, so the font list opens without a pause
         bar.Add(_textButton);
 
         SyncToolButtons();
@@ -316,7 +317,7 @@ public sealed partial class MainWindow
 
     private Flyout BuildTextFlyout()
     {
-        var fonts = new ComboBox { Header = "Font", HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Helvetica", "Times", "Courier" } };
+        var fonts = new FontPicker();
         var size = new NumberBox { Header = "Size", Minimum = 4, Maximum = 288, SmallChange = 1, LargeChange = 4, SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Inline };
         var colors = new VariableSizedWrapGrid { Orientation = Orientation.Horizontal, MaximumRowsOrColumns = 5, ItemWidth = 30, ItemHeight = 30 };
         var flyout = new Flyout { Content = new StackPanel { Spacing = 10, Width = 190, Children = { fonts, size, new TextBlock { Text = "Color" }, colors } } };
@@ -339,14 +340,17 @@ public sealed partial class MainWindow
         flyout.Opening += (_, _) =>
         {
             syncing = true;
-            fonts.SelectedIndex = (int)DocView.CurrentStyle.Font;
+            // The PDF standard fonts first (they add nothing to the file), then every installed font that can be
+            // embedded. A text box from another PC may name a font that isn't installed here; list it too.
+            string current = DocView.CurrentStyle.Font;
+            var names = TextFonts.Standard.Concat(SystemFonts.Families).ToList();
+            if (!names.Contains(current)) names.Insert(TextFonts.Standard.Count, current);
+            fonts.SetFonts(names, current);
             size.Value = DocView.CurrentStyle.FontSize;
             syncing = false;
         };
-        fonts.SelectionChanged += (_, _) =>
+        fonts.FontPicked += f =>
         {
-            if (syncing || fonts.SelectedIndex < 0) return;
-            var f = (PdfStandardFont)fonts.SelectedIndex;
             DocView.CurrentStyle.Font = f;
             DocView.ApplyToSelection(m => { if (m is TextBoxMarkup t) t.Font = f; }, "Change Font");
             SyncStyleSwatches();

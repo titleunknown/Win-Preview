@@ -123,6 +123,37 @@ public class MarkupRoundTripTests
         Assert.True(AnyNotWhite(new(150, 655, 160, 660)), "strikeout");
     }
 
+    /// <summary>
+    /// On a page with /Rotate 90 the app shows text boxes upright and wraps them at their on-screen width, so the
+    /// saved appearance must run its text along the rotated page too, starting at the box's on-screen top-left.
+    /// </summary>
+    [Fact]
+    public void Text_box_on_a_rotated_page_reads_upright()
+    {
+        using var doc = TestPdfs.TextDocument();
+        doc.RotatePage(0, 90);
+        // On screen this box is 400 wide and 24 tall: user X 100..124 is display y, user Y 100..500 is display x.
+        var box = new TextBoxMarkup { Rect = new(100, 100, 124, 500), Text = "WWWW", FontSize = 12 };
+        using var reopened = PdfDocument.Open(SaveWith(doc, [box]));
+        const int w = 792, h = 612; // rotated page
+        var px = reopened.Render(0, w, h);
+
+        bool AnyInk(int x1, int y1, int x2, int y2)
+        {
+            for (int y = y1; y < y2; y++)
+                for (int x = x1; x < x2; x++)
+                {
+                    int i = (y * w + x) * 4;
+                    if (px[i] < 200 || px[i + 1] < 200 || px[i + 2] < 200) return true;
+                }
+            return false;
+        }
+
+        // /Rotate 90 maps user (ux, uy) to display (uy, ux). Upright text sits at the box's display top-left.
+        Assert.True(AnyInk(100, 100, 160, 124), "text should start at the box's on-screen top-left");
+        Assert.False(AnyInk(300, 90, 510, 130), "text should not be wrapped one letter per line down the far end");
+    }
+
     [Fact]
     public void Text_wraps_at_word_boundaries_and_breaks_long_words()
     {

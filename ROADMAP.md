@@ -2,6 +2,14 @@
 
 Planned work, roughly in priority order. [FEATURES.md](FEATURES.md) tracks parity with macOS Preview.
 
+## Released in v0.6
+
+- Text boxes can use any installed font; the font is embedded in the saved PDF. The font list has a search field and
+  shows each name in its own font
+- Text box fixes: lines no longer disappear after clicking off, editing again, resizing or changing the font; boxes
+  keep their width when edited again; text boxes on rotated PDF pages are saved upright
+- Sticky notes keep all their lines when opened again
+
 ## Released in v0.5
 
 - Reliability fixes: Remove Background only changes the image it started on; closing the window with unsaved changes
@@ -37,12 +45,10 @@ configuration are in place; the application to SignPath will happen once the app
 
 ## To do
 
-### Text boxes with system fonts
-Movable, scalable text boxes that can use any font installed on Windows.
+### Text boxes
+Installed fonts are done (v0.6). Still to do:
 
-- Font picker listing installed system fonts (today it's only Helvetica, Times and Courier).
-- Embed the chosen font (subset) in saved PDFs via PDFium's `FPDFText_LoadFont`, so the text looks the same on
-  other computers and supports any language, not just Latin-1.
+- Subset embedded fonts. PDFium's `FPDFText_LoadFont` embeds the whole font file, which is large for CJK fonts.
 - Scaling: dragging a corner handle scales the text with the box (Shift keeps proportions), in addition to
   today's resize-and-rewrap.
 - Bold, italic and alignment options.

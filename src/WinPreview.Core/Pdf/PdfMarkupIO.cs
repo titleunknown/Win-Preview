@@ -14,7 +14,25 @@ internal static class MarkupKeys
     public const string Signature = "WPSignature";
 }
 
-internal sealed record TextBoxData(string Text, double FontSize, PdfStandardFont Font, string Color, string? Fill, double StrokeWidth);
+/// <summary>
+/// The editable source of a text box. <see cref="Font"/> is the standard font's number (0 Helvetica, 1 Times,
+/// 2 Courier) as earlier versions wrote it; <see cref="Family"/> names an installed font and is absent otherwise,
+/// so files with only standard fonts stay readable by older versions.
+/// </summary>
+internal sealed record TextBoxData(string Text, double FontSize, int Font, string Color, string? Fill, double StrokeWidth,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    string? Family = null)
+{
+    public static TextBoxData From(TextBoxMarkup box)
+    {
+        int standard = TextFonts.Standard.ToList().IndexOf(box.Font);
+        return new(box.Text, box.FontSize, Math.Max(0, standard), box.Color.ToHex(), box.Fill?.ToHex(), box.StrokeWidth,
+            standard < 0 ? box.Font : null);
+    }
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string FontName => Family ?? TextFonts.Standard[Math.Clamp(Font, 0, TextFonts.Standard.Count - 1)];
+}
 
 internal static unsafe class PdfMarkupWriter
 {
@@ -131,12 +149,21 @@ internal static unsafe class PdfMarkupWriter
         finally { FPDFPage_CloseAnnot(annot); }
     }
 
-    internal static string FontName(PdfStandardFont f) => f switch
+    /// <summary>
+    /// Makes text objects in a text box's font: a base-14 font by name, or an installed font embedded in the document.
+    /// An installed font that's missing on this PC (the file came from elsewhere) or can't be embedded falls back to
+    /// Helvetica, so the text still shows.
+    /// </summary>
+    private static Func<double, nint> TextObjectFactory(PdfDocument doc, string fontName)
     {
-        PdfStandardFont.TimesRoman => "Times-Roman",
-        PdfStandardFont.Courier => "Courier",
-        _ => "Helvetica",
-    };
+        if (TextFonts.Base14Name(fontName) is not { } base14)
+        {
+            nint font = doc.GetEmbeddedFont(fontName);
+            if (font != 0) return size => FPDFPageObj_CreateTextObj(doc.Handle, font, (float)size);
+            base14 = "Helvetica";
+        }
+        return size => FPDFPageObj_NewTextObj(doc.Handle, base14, (float)size);
+    }
 
     /// <summary>
     /// Text boxes are written as stamp annotations whose appearance holds real text objects, which every
@@ -155,34 +182,42 @@ internal static unsafe class PdfMarkupWriter
                 FPDFAnnot_AppendObject(annot, bg);
             }
 
+            // The app shows text boxes upright on screen, so on a page with /Rotate the text must run along the
+            // rotated page: rotated with it, wrapped at the box's on-screen width, starting at its on-screen top-left.
+            int quarter = (FPDFPage_GetRotation(page) % 4 + 4) % 4;
+            double cos = quarter switch { 0 => 1, 2 => -1, _ => 0 }, sin = quarter switch { 1 => 1, 3 => -1, _ => 0 };
+            var r = box.Rect;
+            double width = quarter % 2 == 0 ? r.Width : r.Height;
+            var (tlx, tly) = quarter switch { 0 => (r.X1, r.Y2), 1 => (r.X1, r.Y1), 2 => (r.X2, r.Y1), _ => (r.X2, r.Y2) };
+
             const double pad = 2;
-            string font = FontName(box.Font);
+            var newText = TextObjectFactory(doc, box.Font);
             double lineHeight = box.FontSize * 1.2;
-            double y = box.Rect.Y2 - pad - box.FontSize * 0.9; // first baseline
-            foreach (var line in TextLayout.Wrap(box.Text, box.Rect.Width - 2 * pad, s => MeasureText(doc, font, box.FontSize, s)))
+            double down = pad + box.FontSize * 0.9; // first baseline, measured down from the on-screen top
+            foreach (var line in TextLayout.Wrap(box.Text, width - 2 * pad, s => MeasureText(newText, box.FontSize, s)))
             {
                 if (line.Length > 0)
                 {
-                    var t = FPDFPageObj_NewTextObj(doc.Handle, font, (float)box.FontSize);
+                    var t = newText(box.FontSize);
                     FPDFText_SetText(t, line);
                     FPDFPageObj_SetFillColor(t, box.Color.R, box.Color.G, box.Color.B, box.Color.A);
-                    FPDFPageObj_Transform(t, 1, 0, 0, 1, box.Rect.X1 + pad, y);
+                    // On-screen "right" is (cos, sin) in user space and "down" is (sin, -cos).
+                    FPDFPageObj_Transform(t, cos, sin, -sin, cos, tlx + cos * pad + sin * down, tly + sin * pad - cos * down);
                     FPDFAnnot_AppendObject(annot, t);
                 }
-                y -= lineHeight;
+                down += lineHeight;
             }
 
             FPDFAnnot_SetStringValue(annot, "Contents", box.Text);
-            FPDFAnnot_SetStringValue(annot, MarkupKeys.TextBox, JsonSerializer.Serialize(new TextBoxData(
-                box.Text, box.FontSize, box.Font, box.Color.ToHex(), box.Fill?.ToHex(), box.StrokeWidth)));
+            FPDFAnnot_SetStringValue(annot, MarkupKeys.TextBox, JsonSerializer.Serialize(TextBoxData.From(box)));
         }
         finally { FPDFPage_CloseAnnot(annot); }
     }
 
-    internal static double MeasureText(PdfDocument doc, string font, double size, string s)
+    private static double MeasureText(Func<double, nint> newText, double size, string s)
     {
         if (s.Length == 0) return 0;
-        var t = FPDFPageObj_NewTextObj(doc.Handle, font, (float)size);
+        var t = newText(size);
         try
         {
             FPDFText_SetText(t, s);
@@ -362,7 +397,7 @@ public static unsafe class PdfMarkupReader
                 var d = JsonSerializer.Deserialize<TextBoxData>(textBoxJson!)!;
                 return new TextBoxMarkup
                 {
-                    Rect = rect, Text = d.Text, FontSize = d.FontSize, Font = d.Font, StrokeWidth = d.StrokeWidth,
+                    Rect = rect, Text = d.Text, FontSize = d.FontSize, Font = d.FontName, StrokeWidth = d.StrokeWidth,
                     Color = RgbaColor.FromHex(d.Color), Fill = d.Fill is null ? null : RgbaColor.FromHex(d.Fill),
                 };
             }

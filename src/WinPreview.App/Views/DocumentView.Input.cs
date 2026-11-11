@@ -436,7 +436,20 @@ public sealed partial class DocumentView
                     double side = Math.Max(Math.Abs(dip.X - opposite.X), Math.Abs(dip.Y - opposite.Y));
                     dip = new Point(opposite.X + Math.Sign(dip.X - opposite.X) * side, opposite.Y + Math.Sign(dip.Y - opposite.Y) * side);
                 }
-                var r = map.ToUser(new Rect(opposite, dip));
+                var box = new Rect(opposite, dip);
+                if (item is TextBoxMarkup tb)
+                {
+                    // Width is the user's to set, down to about a character (narrower would stack one letter per
+                    // line); height never drops below what the wrapped text needs, or the lines past it would be
+                    // clipped. Both grow away from the anchored corner.
+                    double minW = Math.Max(20, tb.FontSize * map.Scale * 1.5);
+                    if (box.Width < minW)
+                        box = dip.X >= opposite.X ? new Rect(opposite.X, box.Y, minW, box.Height) : new Rect(opposite.X - minW, box.Y, minW, box.Height);
+                    double need = MarkupVisuals.TextBoxHeightDip(tb, tb.Text, map, box.Width);
+                    if (box.Height < need)
+                        box = dip.Y >= opposite.Y ? new Rect(box.X, box.Y, box.Width, need) : new Rect(box.X, box.Bottom - need, box.Width, need);
+                }
+                var r = map.ToUser(box);
                 if (item is ShapeMarkup s) s.Rect = r; else ((TextBoxMarkup)item).Rect = r;
                 return;
             }
@@ -613,8 +626,21 @@ public sealed partial class DocumentView
     public bool ApplyToSelection(Action<MarkupItem> change, string name)
     {
         if (_session == null || _selected is not { } s) return false;
-        _session.EditMarkup(s.Page, s.Id, change, name);
+        _session.EditMarkup(s.Page, s.Id, m =>
+        {
+            change(m);
+            // A bigger font or a wider typeface wraps onto more lines; grow the box so they aren't clipped.
+            if (m is TextBoxMarkup tb && s.Page < _pages.Count) FitTextBoxHeight(_pages[s.Page].Mapping, tb);
+        }, name);
         return true;
+    }
+
+    /// <summary>Grows a text box downward (on screen) until its wrapped text fits. Never shrinks it.</summary>
+    private static void FitTextBoxHeight(PageMapping map, TextBoxMarkup tb)
+    {
+        var r = map.ToDip(tb.Rect);
+        double need = MarkupVisuals.TextBoxHeightDip(tb, tb.Text, map, r.Width);
+        if (need > r.Height + 0.5) tb.Rect = map.ToUser(new Rect(r.X, r.Y, r.Width, need));
     }
 
     public void KillFormFocus()

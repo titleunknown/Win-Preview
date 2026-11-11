@@ -65,6 +65,12 @@ internal static unsafe partial class PdfiumNative
     [LibraryImport(Lib, StringMarshalling = StringMarshalling.Utf8)]
     public static partial nint FPDFPageObj_NewTextObj(nint doc, string font, float fontSize);
 
+    public const int FPDF_FONT_TRUETYPE = 2;
+    /// <summary>Embeds a font file in the document. <paramref name="cid"/> = 1 makes it a CID font, so any Unicode text works.</summary>
+    [LibraryImport(Lib)] public static partial nint FPDFText_LoadFont(nint doc, byte* data, uint size, int fontType, int cid);
+    [LibraryImport(Lib)] public static partial nint FPDFPageObj_CreateTextObj(nint doc, nint font, float fontSize);
+    [LibraryImport(Lib)] public static partial void FPDFFont_Close(nint font);
+
     [LibraryImport(Lib, StringMarshalling = StringMarshalling.Utf16)]
     public static partial int FPDFText_SetText(nint textObj, string text);
 
